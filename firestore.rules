@@ -106,7 +106,7 @@ service cloud.firestore {
 
     // 2. User Profiles & Faculty Directory
     match /users/{userId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create: if isSignedIn() && isValidId(userId) && isValidUser(incoming()) && (
         isUserAdmin() || 
         request.auth.uid == userId || 
@@ -121,7 +121,7 @@ service cloud.firestore {
 
     // 3. Lesson Plans (Core Approval Workflow)
     match /lessonPlans/{planId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       
       // Teachers can create their own plans; Admins/Academic Officers can also create
       allow create: if isSignedIn() && isValidId(planId) && isValidLessonPlan(incoming()) && (
@@ -158,13 +158,13 @@ service cloud.firestore {
 
     // 4. Classrooms
     match /classrooms/{classId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create, update, delete: if isUserAdmin() && isValidId(classId) && isValidClassroom(incoming());
     }
 
     // 5. School Grade Levels
     match /levels/{levelId} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow create, update, delete: if isUserAdmin() && isValidId(levelId);
     }
 

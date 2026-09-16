@@ -377,7 +377,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [classrooms, setClassrooms] = useState<Classroom[]>(() => {
     try {
       const saved = safeLocalStorageGet(STORAGE_KEYS.CLASSROOMS);
-      return saved ? JSON.parse(saved) : INITIAL_CLASSROOMS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const map = new Map<string, Classroom>();
+          INITIAL_CLASSROOMS.forEach(c => map.set(c.id, c));
+          parsed.forEach((c: Classroom) => map.set(c.id, c));
+          return Array.from(map.values());
+        }
+      }
+      return INITIAL_CLASSROOMS;
     } catch {
       return INITIAL_CLASSROOMS;
     }
@@ -387,7 +396,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>(() => {
     try {
       const saved = safeLocalStorageGet(STORAGE_KEYS.LESSON_PLANS);
-      return saved ? JSON.parse(saved) : INITIAL_LESSON_PLANS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const map = new Map<string, LessonPlan>();
+          INITIAL_LESSON_PLANS.forEach(p => map.set(p.id, p));
+          parsed.forEach((p: LessonPlan) => map.set(p.id, p));
+          return Array.from(map.values());
+        }
+      }
+      return INITIAL_LESSON_PLANS;
     } catch {
       return INITIAL_LESSON_PLANS;
     }
