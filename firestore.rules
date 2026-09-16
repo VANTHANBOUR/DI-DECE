@@ -177,7 +177,8 @@ service cloud.firestore {
 
     // 7. System Connection Health Check
     match /system/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if true;
+      allow write: if isSignedIn();
     }
   }
 }

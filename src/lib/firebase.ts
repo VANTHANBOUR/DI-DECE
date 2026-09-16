@@ -42,8 +42,20 @@ googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
-// Initialize Firestore safely with database ID from configuration
-export const db: Firestore = getFirestore(app, (firebaseConfig as any).firestoreDatabaseId);
+// Initialize Firestore safely with database ID and resilient iframe-compatible transport
+const firestoreDbId = (firebaseConfig as any).firestoreDatabaseId;
+
+let firestoreInstance: Firestore;
+try {
+  firestoreInstance = initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+    ignoreUndefinedProperties: true,
+  }, firestoreDbId || undefined);
+} catch {
+  firestoreInstance = getFirestore(app, firestoreDbId || undefined);
+}
+
+export const db: Firestore = firestoreInstance;
 
 export const FIRESTORE_UPGRADE_URL = `https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/databases/${(firebaseConfig as any).firestoreDatabaseId}/data?openUpgradeDialog=true`;
 export const FIREBASE_AUTH_SETTINGS_URL = `https://console.firebase.google.com/project/${firebaseConfig.projectId}/authentication/settings`;
@@ -79,12 +91,22 @@ export function sanitizeForFirestore<T>(data: T): T {
   return data;
 }
 
-// Analytics setup guarded for browser support
+// Analytics setup strictly guarded for valid measurementId and browser support
 let analyticsInstance: any = null;
-if (typeof window !== 'undefined') {
+const measurementId = (firebaseConfig as any)?.measurementId;
+if (
+  typeof window !== 'undefined' && 
+  measurementId && 
+  typeof measurementId === 'string' && 
+  measurementId.trim().length > 0
+) {
   isSupported().then((supported) => {
     if (supported) {
-      analyticsInstance = getAnalytics(app);
+      try {
+        analyticsInstance = getAnalytics(app);
+      } catch (err) {
+        // Analytics optional in restricted iframe environments
+      }
     }
   }).catch(() => {
     // Analytics optional in restricted iframe environments
@@ -147,7 +169,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 // Connection test helper following Firebase skill guidelines
 export async function testFirestoreConnection(): Promise<FirestoreStatus> {
   try {
-    const docRef = doc(db, 'system', 'connection_test');
+    const docRef = doc(db, 'settings', 'schoolProfile');
     await getDocFromServer(docRef);
     return {
       isConnected: true,
@@ -172,7 +194,7 @@ export async function testFirestoreConnection(): Promise<FirestoreStatus> {
     }
 
     if (isOffline) {
-      console.info('Firestore is operating in offline mode.');
+      console.info('Firestore is operating in offline mode (local cache active).');
       return {
         isConnected: false,
         isQuotaExceeded: false,
