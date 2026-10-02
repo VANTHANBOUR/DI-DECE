@@ -51,9 +51,7 @@ export const AuthGate: React.FC = () => {
     isSignUpAllowedForCampus,
     unauthorizedDomain,
     authSettingsUrl,
-    clearUnauthorizedDomain,
-    pullCloudData,
-    isSyncingLive
+    clearUnauthorizedDomain
   } = useApp();
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
@@ -168,6 +166,9 @@ export const AuthGate: React.FC = () => {
     setSignInPassword('password123');
     setIsLoading(true);
     try {
+      if (acc.role === 'admin' || acc.role === 'academic_officer') {
+        setSelectedCampusId('ALL');
+      }
       await signIn(acc.email, 'password123');
     } finally {
       setIsLoading(false);
@@ -191,25 +192,13 @@ export const AuthGate: React.FC = () => {
             </div>
           </div>
 
-          {/* Firebase Connection Status & Cloud Pull */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => pullCloudData(true)}
-              disabled={isSyncingLive}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-200 text-xs font-bold transition-all shadow-xs disabled:opacity-50"
-              title="Pull latest data & lesson plans from Cloud Firestore database"
-            >
-              <Database className={`w-3.5 h-3.5 text-emerald-300 ${isSyncingLive ? 'animate-spin' : ''}`} />
-              <span>{isSyncingLive ? 'Syncing...' : 'Pull Firestore Data'}</span>
-            </button>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 border border-white/15 text-xs">
-              <div className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </div>
-              <span className="text-emerald-300 font-bold hidden sm:inline">Firestore Online</span>
+          {/* Firebase Connection Status */}
+          <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-white/10 border border-white/15 text-xs">
+            <div className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
             </div>
+            <span className="text-emerald-300 font-bold">Central Auth & Firestore Online</span>
           </div>
         </div>
       </header>
@@ -541,6 +530,25 @@ export const AuthGate: React.FC = () => {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    {/* Academic Officer Profile (Primary Reviewer) */}
+                    {allAccounts.filter(a => a.role === 'academic_officer').slice(0, 1).map(acc => (
+                      <button
+                        key={acc.id}
+                        type="button"
+                        onClick={() => handleQuickDemoLogin(acc)}
+                        disabled={isLoading}
+                        className="flex items-center gap-2 p-2 rounded-xl bg-blue-50/80 border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-100/70 transition-all text-left shadow-xs group"
+                      >
+                        <UserAvatar src={acc.avatar} name={acc.name} className="w-8 h-8 rounded-lg ring-2 ring-blue-500 shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-black text-slate-900 truncate">{acc.name}</p>
+                          <span className="text-[8px] font-black uppercase px-1.5 py-0.2 bg-blue-600 text-white rounded inline-block">
+                            🎓 Academic Officer (All 10 Plans)
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+
                     {/* Admin Profile */}
                     {allAccounts.filter(a => a.role === 'admin').slice(0, 1).map(acc => (
                       <button
@@ -554,26 +562,7 @@ export const AuthGate: React.FC = () => {
                         <div className="min-w-0">
                           <p className="text-[11px] font-bold text-slate-900 truncate">{acc.name}</p>
                           <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.2 bg-amber-100 text-amber-900 rounded inline-block">
-                            👑 Admin / Principal
-                          </span>
-                        </div>
-                      </button>
-                    ))}
-
-                    {/* Academic Officer Profile */}
-                    {allAccounts.filter(a => a.role === 'academic_officer').slice(0, 1).map(acc => (
-                      <button
-                        key={acc.id}
-                        type="button"
-                        onClick={() => handleQuickDemoLogin(acc)}
-                        disabled={isLoading}
-                        className="flex items-center gap-2 p-2 rounded-xl bg-white border border-blue-300 hover:border-blue-500 hover:bg-blue-50/60 transition-all text-left shadow-2xs group"
-                      >
-                        <UserAvatar src={acc.avatar} name={acc.name} className="w-8 h-8 rounded-lg ring-1 ring-blue-400 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-bold text-slate-900 truncate">{acc.name}</p>
-                          <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.2 bg-blue-100 text-blue-900 rounded inline-block">
-                            🎓 Academic Officer
+                            👑 Principal (All 10 Plans)
                           </span>
                         </div>
                       </button>

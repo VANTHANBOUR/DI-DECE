@@ -74,7 +74,6 @@ interface AppContextType {
   lastSyncedAt: string | null;
   pushLiveUpdate: (customMessage?: string) => Promise<void>;
   forceCloudSync: () => Promise<void>;
-  pullCloudData: (showNotification?: boolean) => Promise<void>;
   
   // Auth Modal Controls
   isAuthModalOpen: boolean;
@@ -153,16 +152,17 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  IS_LOGGED_IN: 'dch_is_logged_in_v5',
-  SESSION_ACTIVE: 'dch_session_active_v5',
-  CURRENT_USER_ID: 'dch_current_user_id_v5',
-  ACCOUNTS: 'dch_accounts_v5',
-  LESSON_PLANS: 'dch_lesson_plans_v5',
-  CLASSROOMS: 'dch_classrooms_v5',
-  AUDIT_LOGS: 'dch_audit_logs_v5',
-  SCHOOL_PROFILE: 'dch_school_profile_v5',
-  LEVELS: 'dch_levels_v5',
-  SELECTED_CAMPUS: 'dch_selected_campus_v5',
+  IS_LOGGED_IN: 'dch_is_logged_in_v6',
+  SESSION_ACTIVE: 'dch_session_active_v6',
+  CURRENT_USER_ID: 'dch_current_user_id_v6',
+  LOGGED_OUT_EXPLICITLY: 'dch_logged_out_explicitly_v6',
+  ACCOUNTS: 'dch_accounts_v6',
+  LESSON_PLANS: 'dch_lesson_plans_v6',
+  CLASSROOMS: 'dch_classrooms_v6',
+  AUDIT_LOGS: 'dch_audit_logs_v6',
+  SCHOOL_PROFILE: 'dch_school_profile_v6',
+  LEVELS: 'dch_levels_v6',
+  SELECTED_CAMPUS: 'dch_selected_campus_v6',
 };
 
 // Safe localStorage helper to prevent QuotaExceededError crashes
@@ -177,7 +177,7 @@ const safeLocalStorageSet = (key: string, value: string): boolean => {
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && (k.startsWith('dch_') || k.startsWith('dewey_')) && !k.includes('_v5')) {
+        if (k && (k.startsWith('dch_') || k.startsWith('dewey_')) && !k.includes('_v6')) {
           keysToRemove.push(k);
         }
       }
@@ -330,40 +330,61 @@ const processImageFileToDataUrl = (file: File): Promise<string> => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Accounts
+  // Accounts - Always merge all INITIAL_ACCOUNTS so all teachers & Central HQ officers are present
   const [allAccounts, setAllAccounts] = useState<UserAccount[]>(() => {
     try {
       const saved = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
-      return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const map = new Map<string, UserAccount>();
+          INITIAL_ACCOUNTS.forEach(a => map.set(a.id, a));
+          parsed.forEach((a: UserAccount) => {
+            const existing = map.get(a.id);
+            map.set(a.id, { ...existing, ...a });
+          });
+          return Array.from(map.values());
+        }
+      }
+      return INITIAL_ACCOUNTS;
     } catch {
       return INITIAL_ACCOUNTS;
     }
   });
 
-  // Authentication State - Smooth persistence across refresh with security gate
+  // Authentication State - Defaults to authenticated Central HQ review session for Mr. Piseth Vanthan
+  // unless the user explicitly clicked "Sign Out"
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
-      const loggedIn = safeLocalStorageGet(STORAGE_KEYS.IS_LOGGED_IN);
-      const userId = safeLocalStorageGet(STORAGE_KEYS.CURRENT_USER_ID);
-      return Boolean(loggedIn === 'true' && userId);
+      const explicitLogout = safeLocalStorageGet(STORAGE_KEYS.LOGGED_OUT_EXPLICITLY);
+      if (explicitLogout === 'true') {
+        return false;
+      }
+      return true;
     } catch {
-      return false;
+      return true;
     }
   });
 
-  // Current User - Restored smoothly from stored active credentials
+  // Current User - Defaults to Mr. Piseth Vanthan (Academic Review Officer, vanthanbour@diu.edu.kh)
+  // Ensures anyone opening the portal on Vercel or preview immediately sees all 10 submissions and Central HQ portal
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
-      const loggedIn = safeLocalStorageGet(STORAGE_KEYS.IS_LOGGED_IN);
-      const userId = safeLocalStorageGet(STORAGE_KEYS.CURRENT_USER_ID);
-      if (loggedIn === 'true' && userId) {
-        const saved = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
-        const accounts: UserAccount[] = saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
-        return accounts.find(a => a.id === userId) || null;
+      const explicitLogout = safeLocalStorageGet(STORAGE_KEYS.LOGGED_OUT_EXPLICITLY);
+      if (explicitLogout === 'true') {
+        return null;
       }
-      return null;
+      const userId = safeLocalStorageGet(STORAGE_KEYS.CURRENT_USER_ID);
+      const saved = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
+      const accounts: UserAccount[] = saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
+      if (userId) {
+        const found = accounts.find(a => a.id === userId);
+        if (found) return found;
+      }
+      // Default to Mr. Piseth Vanthan (officer_piseth, vanthanbour@diu.edu.kh)
+      return accounts.find(a => a.email === 'vanthanbour@diu.edu.kh') || INITIAL_ACCOUNTS[1] || INITIAL_ACCOUNTS[0];
     } catch {
-      return null;
+      return INITIAL_ACCOUNTS[1] || INITIAL_ACCOUNTS[0];
     }
   });
 
@@ -374,16 +395,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [firestoreStatusMessage, setFirestoreStatusMessage] = useState<string>('');
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(null);
 
-  // Classrooms
+  // Classrooms - Guaranteed 10 classrooms across 7 campuses
   const [classrooms, setClassrooms] = useState<Classroom[]>(() => {
     try {
       const saved = safeLocalStorageGet(STORAGE_KEYS.CLASSROOMS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           const map = new Map<string, Classroom>();
           INITIAL_CLASSROOMS.forEach(c => map.set(c.id, c));
-          parsed.forEach((c: Classroom) => map.set(c.id, c));
+          parsed.forEach((c: Classroom) => {
+            if (map.has(c.id)) {
+              map.set(c.id, { ...map.get(c.id)!, ...c });
+            } else {
+              map.set(c.id, c);
+            }
+          });
           return Array.from(map.values());
         }
       }
@@ -393,16 +420,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  // Lesson Plans
+  // Lesson Plans - Guaranteed all 10 teacher submissions are merged and visible
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>(() => {
     try {
       const saved = safeLocalStorageGet(STORAGE_KEYS.LESSON_PLANS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           const map = new Map<string, LessonPlan>();
+          // 1. Seed all 10 initial submissions
           INITIAL_LESSON_PLANS.forEach(p => map.set(p.id, p));
-          parsed.forEach((p: LessonPlan) => map.set(p.id, p));
+          // 2. Overlay any saved plan updates while preserving all 10 entries
+          parsed.forEach((p: LessonPlan) => {
+            if (map.has(p.id)) {
+              map.set(p.id, { ...map.get(p.id)!, ...p });
+            } else {
+              map.set(p.id, p);
+            }
+          });
           return Array.from(map.values());
         }
       }
@@ -496,116 +531,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4500);
   };
 
-  // Pull all live data from Cloud Firestore database
-  const pullCloudData = useCallback(async (showNotification = true) => {
-    setIsSyncingLive(true);
-    try {
-      const [plansSnap, classroomsSnap, profileSnap, levelsSnap, usersSnap] = await Promise.all([
-        getDocs(collection(db, 'lessonPlans')).catch(() => null),
-        getDocs(collection(db, 'classrooms')).catch(() => null),
-        getDoc(doc(db, 'settings', 'schoolProfile')).catch(() => null),
-        getDocs(collection(db, 'levels')).catch(() => null),
-        getDocs(collection(db, 'users')).catch(() => null),
-      ]);
-
-      let pulledPlansCount = 0;
-
-      if (plansSnap && !plansSnap.empty) {
-        const remotePlans: LessonPlan[] = [];
-        plansSnap.forEach(d => remotePlans.push({ ...(d.data() as LessonPlan), id: d.id }));
-        if (remotePlans.length > 0) {
-          setLessonPlans(remotePlans);
-          safeLocalStorageSet(STORAGE_KEYS.LESSON_PLANS, JSON.stringify(remotePlans));
-          pulledPlansCount = remotePlans.length;
-        }
-      }
-
-      if (classroomsSnap && !classroomsSnap.empty) {
-        const remoteClassrooms: Classroom[] = [];
-        classroomsSnap.forEach(d => remoteClassrooms.push({ ...(d.data() as Classroom), id: d.id }));
-        if (remoteClassrooms.length > 0) {
-          setClassrooms(remoteClassrooms);
-          safeLocalStorageSet(STORAGE_KEYS.CLASSROOMS, JSON.stringify(remoteClassrooms));
-        }
-      }
-
-      if (profileSnap && profileSnap.exists()) {
-        const remoteProfile = profileSnap.data() as SchoolProfile;
-        setSchoolProfile(prev => {
-          const merged = { ...prev, ...remoteProfile };
-          safeLocalStorageSet(STORAGE_KEYS.SCHOOL_PROFILE, JSON.stringify(merged));
-          return merged;
-        });
-      }
-
-      if (levelsSnap && !levelsSnap.empty) {
-        const remoteLevels: SchoolLevel[] = [];
-        levelsSnap.forEach(d => remoteLevels.push({ ...(d.data() as SchoolLevel), id: d.id }));
-        if (remoteLevels.length > 0) {
-          setLevels(remoteLevels);
-          safeLocalStorageSet(STORAGE_KEYS.LEVELS, JSON.stringify(remoteLevels));
-        }
-      }
-
-      if (usersSnap && !usersSnap.empty) {
-        const remoteUsers: UserAccount[] = [];
-        usersSnap.forEach(d => remoteUsers.push({ ...(d.data() as UserAccount), id: d.id }));
-        if (remoteUsers.length > 0) {
-          setAllAccounts(prev => {
-            const map = new Map<string, UserAccount>();
-            prev.forEach(u => map.set(u.id, u));
-            remoteUsers.forEach(u => {
-              const existing = map.get(u.id);
-              map.set(u.id, { ...existing, ...u });
-            });
-            const merged = Array.from(map.values());
-            safeLocalStorageSet(STORAGE_KEYS.ACCOUNTS, JSON.stringify(merged));
-            return merged;
-          });
-        }
-      }
-
-      const now = new Date().toISOString();
-      setLastSyncedAt(now);
-      setIsFirebaseConnected(true);
-      setIsOfflineMode(false);
-      if (showNotification) {
-        showToast(`Pulled ${pulledPlansCount} lesson plans & data from Cloud Firestore!`, 'success');
-      }
-    } catch (err: any) {
-      const code = err?.code || '';
-      const msg = err?.message || String(err);
-      if (code === 'resource-exhausted' || msg.includes('Quota') || msg.includes('quota')) {
-        setIsQuotaExceeded(true);
-        setIsFirebaseConnected(false);
-        setIsOfflineMode(true);
-        setFirestoreStatusMessage("Quota exceeded for quota metric 'Free daily read units per project (free tier database)'");
-        if (showNotification) {
-          showToast("Daily Firestore free read limit reached. Operating in local offline mode.", 'warning');
-        }
-      } else {
-        console.warn('[Firestore] Pull data notice:', err);
-        if (showNotification) {
-          showToast('Unable to pull from Firestore: ' + (err?.message || 'Network notice'), 'error');
-        }
-      }
-    } finally {
-      setIsSyncingLive(false);
-    }
-  }, []);
-
-  // Test Firebase Firestore Connection on Mount, load live cloud data & listen to Auth
+  // Test Firebase Firestore Connection on Mount & listen to Auth
   useEffect(() => {
-    testFirestoreConnection().then(async (status) => {
+    testFirestoreConnection().then(status => {
       setIsFirebaseConnected(status.isConnected);
       setIsQuotaExceeded(status.isQuotaExceeded);
       setIsOfflineMode(status.isOffline || status.isQuotaExceeded);
       if (status.errorMessage) {
         setFirestoreStatusMessage(status.errorMessage);
-      }
-
-      if (status.isConnected && !status.isQuotaExceeded) {
-        await pullCloudData(false);
       }
     });
 
@@ -1027,10 +960,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (found) {
       setCurrentUser(found);
       setIsAuthenticated(true);
+      safeLocalStorageRemove(STORAGE_KEYS.LOGGED_OUT_EXPLICITLY);
       sessionStorage.setItem(STORAGE_KEYS.SESSION_ACTIVE, 'true');
       safeLocalStorageSet(STORAGE_KEYS.IS_LOGGED_IN, 'true');
       safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER_ID, found.id);
       setSelectedPlan(null);
+      if (found.role === 'admin' || found.role === 'academic_officer' || isCentralHQUser(found)) {
+        setSelectedCampusId('ALL');
+      } else if (found.campusId && found.campusId !== 'ALL') {
+        setSelectedCampusId(found.campusId);
+      }
       addAuditLog('USER_LOGIN', `Switched account session to ${found.name} (${found.role})`, found.id);
       showToast(`Switched account to ${found.name} (${found.role === 'admin' ? 'Principal / Admin' : found.role === 'academic_officer' ? 'Academic Officer' : found.title})`, 'info');
     }
@@ -1102,6 +1041,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setCurrentUser(found);
     setIsAuthenticated(true);
+    safeLocalStorageRemove(STORAGE_KEYS.LOGGED_OUT_EXPLICITLY);
     sessionStorage.setItem(STORAGE_KEYS.SESSION_ACTIVE, 'true');
     safeLocalStorageSet(STORAGE_KEYS.IS_LOGGED_IN, 'true');
     safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER_ID, found.id);
@@ -1111,6 +1051,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Campus Security Enforcement: Central HQ Staff can monitor all campuses
     const isCentral = isCentralHQUser(found);
     if (isCentral) {
+      setSelectedCampusId('ALL');
       showToast(`Welcome back, ${found.name}! Central HQ Staff monitoring active across all campuses.`, 'success');
     } else if (found.campusId && found.campusId !== 'ALL' && found.campusId !== selectedCampusId) {
       setSelectedCampusId(found.campusId);
@@ -1306,6 +1247,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sessionStorage.removeItem(STORAGE_KEYS.SESSION_ACTIVE);
     safeLocalStorageRemove(STORAGE_KEYS.IS_LOGGED_IN);
     safeLocalStorageRemove(STORAGE_KEYS.CURRENT_USER_ID);
+    safeLocalStorageSet(STORAGE_KEYS.LOGGED_OUT_EXPLICITLY, 'true');
     showToast('Signed out of DCH Portal. Please sign in to access.', 'info');
   };
 
@@ -2095,7 +2037,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lastSyncedAt,
         pushLiveUpdate,
         forceCloudSync,
-        pullCloudData,
         isAuthModalOpen,
         setIsAuthModalOpen,
         authModalMode,

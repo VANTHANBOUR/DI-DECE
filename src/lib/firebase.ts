@@ -170,11 +170,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 export async function testFirestoreConnection(): Promise<FirestoreStatus> {
   try {
     const docRef = doc(db, 'settings', 'schoolProfile');
-    try {
-      await getDocFromServer(docRef);
-    } catch {
-      await getDoc(docRef);
-    }
+    await getDocFromServer(docRef);
     return {
       isConnected: true,
       isQuotaExceeded: false,

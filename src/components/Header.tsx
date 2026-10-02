@@ -62,8 +62,6 @@ export const Header: React.FC<HeaderProps> = ({
     isQuotaExceeded,
     quotaUpgradeUrl,
     isOfflineMode,
-    pullCloudData,
-    isSyncingLive,
   } = useApp();
 
   const displayedPlansCount = React.useMemo(() => {
@@ -209,17 +207,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>Profile & Logo</span>
               </button>
             )}
-
-            {/* Pull / Sync Firestore Button */}
-            <button
-              onClick={() => pullCloudData(true)}
-              disabled={isSyncingLive}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold text-emerald-950 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl transition-all shadow-2xs active:scale-95 disabled:opacity-50"
-              title="Pull latest data & lesson plans from Google Cloud Firestore"
-            >
-              <Database className={`w-3.5 h-3.5 text-emerald-700 ${isSyncingLive ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isSyncingLive ? 'Syncing...' : 'Sync Firestore'}</span>
-            </button>
 
             {/* Offline / Quota Badge */}
             {isQuotaExceeded && (
