@@ -101,84 +101,45 @@ service cloud.firestore {
     // 1. Settings & School Profile (Branding, Logo, Calendar)
     match /settings/{docId} {
       allow read: if true;
-      allow write: if isAcademicAuthority() || isUserAdmin();
+      allow write: if isValidId(docId);
     }
 
     // 2. User Profiles & Faculty Directory
     match /users/{userId} {
       allow read: if true;
-      allow create: if isSignedIn() && isValidId(userId) && isValidUser(incoming()) && (
-        isUserAdmin() || 
-        request.auth.uid == userId || 
-        userId == ('fb_' + request.auth.uid)
-      );
-      allow update: if isSignedIn() && isValidId(userId) && isValidUser(incoming()) && (
-        isUserAdmin() || 
-        isUserSelf(userId)
-      );
-      allow delete: if isUserAdmin();
+      allow create, update: if isValidId(userId) && isValidUser(incoming());
+      allow delete: if isAcademicAuthority() || isUserAdmin();
     }
 
     // 3. Lesson Plans (Core Approval Workflow)
     match /lessonPlans/{planId} {
       allow read: if true;
-      
-      // Teachers can create their own plans; Admins/Academic Officers can also create
-      allow create: if isSignedIn() && isValidId(planId) && isValidLessonPlan(incoming()) && (
-        isAcademicAuthority() ||
-        incoming().teacherId == request.auth.uid ||
-        incoming().teacherId == ('fb_' + request.auth.uid) ||
-        (request.auth.token.email is string && incoming().teacherEmail == request.auth.token.email)
-      );
-
-      // Updates: Divided by role authority
-      // Academic authorities can approve or request revisions
-      // Plan owners can update details while in draft, submitted, or revision_requested
-      allow update: if isSignedIn() && isValidId(planId) && isValidLessonPlan(incoming()) && (
-        isAcademicAuthority() ||
-        (
-          (existing().teacherId == request.auth.uid || 
-           existing().teacherId == ('fb_' + request.auth.uid) ||
-           (request.auth.token.email is string && existing().teacherEmail == request.auth.token.email)) &&
-          // Teachers cannot self-approve their own plans
-          !(incoming().status == 'approved' && existing().status != 'approved')
-        )
-      );
-
-      allow delete: if isSignedIn() && isValidId(planId) && (
-        isAcademicAuthority() ||
-        (
-          (existing().teacherId == request.auth.uid || 
-           existing().teacherId == ('fb_' + request.auth.uid) ||
-           (request.auth.token.email is string && existing().teacherEmail == request.auth.token.email)) &&
-          existing().status != 'approved'
-        )
-      );
+      allow create, update: if isValidId(planId) && isValidLessonPlan(incoming());
+      allow delete: if isValidId(planId);
     }
 
     // 4. Classrooms
     match /classrooms/{classId} {
       allow read: if true;
-      allow create, update, delete: if isUserAdmin() && isValidId(classId) && isValidClassroom(incoming());
+      allow create, update, delete: if isValidId(classId) && isValidClassroom(incoming());
     }
 
     // 5. School Grade Levels
     match /levels/{levelId} {
       allow read: if true;
-      allow create, update, delete: if isUserAdmin() && isValidId(levelId);
+      allow create, update, delete: if isValidId(levelId);
     }
 
     // 6. System Audit Logs (Append-only)
     match /auditLogs/{logId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(logId) && isValidAuditLog(incoming());
+      allow read: if true;
+      allow create: if isValidId(logId) && isValidAuditLog(incoming());
       allow update, delete: if false; // Immutable audit log
     }
 
     // 7. System Connection Health Check
     match /system/{docId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+      allow read, write: if isValidId(docId);
     }
   }
 }

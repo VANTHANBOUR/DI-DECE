@@ -152,17 +152,16 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  IS_LOGGED_IN: 'dch_is_logged_in_v6',
-  SESSION_ACTIVE: 'dch_session_active_v6',
-  CURRENT_USER_ID: 'dch_current_user_id_v6',
-  LOGGED_OUT_EXPLICITLY: 'dch_logged_out_explicitly_v6',
-  ACCOUNTS: 'dch_accounts_v6',
-  LESSON_PLANS: 'dch_lesson_plans_v6',
-  CLASSROOMS: 'dch_classrooms_v6',
-  AUDIT_LOGS: 'dch_audit_logs_v6',
-  SCHOOL_PROFILE: 'dch_school_profile_v6',
-  LEVELS: 'dch_levels_v6',
-  SELECTED_CAMPUS: 'dch_selected_campus_v6',
+  IS_LOGGED_IN: 'dch_is_logged_in_v5',
+  SESSION_ACTIVE: 'dch_session_active_v5',
+  CURRENT_USER_ID: 'dch_current_user_id_v5',
+  ACCOUNTS: 'dch_accounts_v5',
+  LESSON_PLANS: 'dch_lesson_plans_v5',
+  CLASSROOMS: 'dch_classrooms_v5',
+  AUDIT_LOGS: 'dch_audit_logs_v5',
+  SCHOOL_PROFILE: 'dch_school_profile_v5',
+  LEVELS: 'dch_levels_v5',
+  SELECTED_CAMPUS: 'dch_selected_campus_v5',
 };
 
 // Safe localStorage helper to prevent QuotaExceededError crashes
@@ -177,7 +176,7 @@ const safeLocalStorageSet = (key: string, value: string): boolean => {
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && (k.startsWith('dch_') || k.startsWith('dewey_')) && !k.includes('_v6')) {
+        if (k && (k.startsWith('dch_') || k.startsWith('dewey_')) && !k.includes('_v5')) {
           keysToRemove.push(k);
         }
       }
@@ -330,61 +329,40 @@ const processImageFileToDataUrl = (file: File): Promise<string> => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Accounts - Always merge all INITIAL_ACCOUNTS so all teachers & Central HQ officers are present
+  // Accounts
   const [allAccounts, setAllAccounts] = useState<UserAccount[]>(() => {
     try {
       const saved = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const map = new Map<string, UserAccount>();
-          INITIAL_ACCOUNTS.forEach(a => map.set(a.id, a));
-          parsed.forEach((a: UserAccount) => {
-            const existing = map.get(a.id);
-            map.set(a.id, { ...existing, ...a });
-          });
-          return Array.from(map.values());
-        }
-      }
-      return INITIAL_ACCOUNTS;
+      return saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
     } catch {
       return INITIAL_ACCOUNTS;
     }
   });
 
-  // Authentication State - Defaults to authenticated Central HQ review session for Mr. Piseth Vanthan
-  // unless the user explicitly clicked "Sign Out"
+  // Authentication State - Smooth persistence across refresh with security gate
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     try {
-      const explicitLogout = safeLocalStorageGet(STORAGE_KEYS.LOGGED_OUT_EXPLICITLY);
-      if (explicitLogout === 'true') {
-        return false;
-      }
-      return true;
+      const loggedIn = safeLocalStorageGet(STORAGE_KEYS.IS_LOGGED_IN);
+      const userId = safeLocalStorageGet(STORAGE_KEYS.CURRENT_USER_ID);
+      return Boolean(loggedIn === 'true' && userId);
     } catch {
-      return true;
+      return false;
     }
   });
 
-  // Current User - Defaults to Mr. Piseth Vanthan (Academic Review Officer, vanthanbour@diu.edu.kh)
-  // Ensures anyone opening the portal on Vercel or preview immediately sees all 10 submissions and Central HQ portal
+  // Current User - Restored smoothly from stored active credentials
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
-      const explicitLogout = safeLocalStorageGet(STORAGE_KEYS.LOGGED_OUT_EXPLICITLY);
-      if (explicitLogout === 'true') {
-        return null;
-      }
+      const loggedIn = safeLocalStorageGet(STORAGE_KEYS.IS_LOGGED_IN);
       const userId = safeLocalStorageGet(STORAGE_KEYS.CURRENT_USER_ID);
-      const saved = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
-      const accounts: UserAccount[] = saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
-      if (userId) {
-        const found = accounts.find(a => a.id === userId);
-        if (found) return found;
+      if (loggedIn === 'true' && userId) {
+        const saved = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
+        const accounts: UserAccount[] = saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
+        return accounts.find(a => a.id === userId) || null;
       }
-      // Default to Mr. Piseth Vanthan (officer_piseth, vanthanbour@diu.edu.kh)
-      return accounts.find(a => a.email === 'vanthanbour@diu.edu.kh') || INITIAL_ACCOUNTS[1] || INITIAL_ACCOUNTS[0];
+      return null;
     } catch {
-      return INITIAL_ACCOUNTS[1] || INITIAL_ACCOUNTS[0];
+      return null;
     }
   });
 
@@ -395,22 +373,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [firestoreStatusMessage, setFirestoreStatusMessage] = useState<string>('');
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(null);
 
-  // Classrooms - Guaranteed 10 classrooms across 7 campuses
+  // Classrooms
   const [classrooms, setClassrooms] = useState<Classroom[]>(() => {
     try {
       const saved = safeLocalStorageGet(STORAGE_KEYS.CLASSROOMS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           const map = new Map<string, Classroom>();
           INITIAL_CLASSROOMS.forEach(c => map.set(c.id, c));
-          parsed.forEach((c: Classroom) => {
-            if (map.has(c.id)) {
-              map.set(c.id, { ...map.get(c.id)!, ...c });
-            } else {
-              map.set(c.id, c);
-            }
-          });
+          parsed.forEach((c: Classroom) => map.set(c.id, c));
           return Array.from(map.values());
         }
       }
@@ -420,24 +392,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  // Lesson Plans - Guaranteed all 10 teacher submissions are merged and visible
+  // Lesson Plans
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>(() => {
     try {
       const saved = safeLocalStorageGet(STORAGE_KEYS.LESSON_PLANS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           const map = new Map<string, LessonPlan>();
-          // 1. Seed all 10 initial submissions
           INITIAL_LESSON_PLANS.forEach(p => map.set(p.id, p));
-          // 2. Overlay any saved plan updates while preserving all 10 entries
-          parsed.forEach((p: LessonPlan) => {
-            if (map.has(p.id)) {
-              map.set(p.id, { ...map.get(p.id)!, ...p });
-            } else {
-              map.set(p.id, p);
-            }
-          });
+          parsed.forEach((p: LessonPlan) => map.set(p.id, p));
           return Array.from(map.values());
         }
       }
@@ -531,14 +495,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4500);
   };
 
-  // Test Firebase Firestore Connection on Mount & listen to Auth
+  // Test Firebase Firestore Connection on Mount, load live cloud data & listen to Auth
   useEffect(() => {
-    testFirestoreConnection().then(status => {
+    testFirestoreConnection().then(async (status) => {
       setIsFirebaseConnected(status.isConnected);
       setIsQuotaExceeded(status.isQuotaExceeded);
       setIsOfflineMode(status.isOffline || status.isQuotaExceeded);
       if (status.errorMessage) {
         setFirestoreStatusMessage(status.errorMessage);
+      }
+
+      if (status.isConnected && !status.isQuotaExceeded) {
+        try {
+          const [plansSnap, classroomsSnap, profileSnap, levelsSnap] = await Promise.all([
+            getDocs(collection(db, 'lessonPlans')).catch(() => null),
+            getDocs(collection(db, 'classrooms')).catch(() => null),
+            getDoc(doc(db, 'settings', 'schoolProfile')).catch(() => null),
+            getDocs(collection(db, 'levels')).catch(() => null),
+          ]);
+
+          if (plansSnap && !plansSnap.empty) {
+            const remotePlans: LessonPlan[] = [];
+            plansSnap.forEach(d => remotePlans.push({ ...d.data() as LessonPlan, id: d.id }));
+            if (remotePlans.length > 0) {
+              setLessonPlans(remotePlans);
+            }
+          }
+
+          if (classroomsSnap && !classroomsSnap.empty) {
+            const remoteClassrooms: Classroom[] = [];
+            classroomsSnap.forEach(d => remoteClassrooms.push({ ...d.data() as Classroom, id: d.id }));
+            if (remoteClassrooms.length > 0) {
+              setClassrooms(remoteClassrooms);
+            }
+          }
+
+          if (profileSnap && profileSnap.exists()) {
+            const remoteProfile = profileSnap.data() as SchoolProfile;
+            setSchoolProfile(prev => ({ ...prev, ...remoteProfile }));
+          }
+
+          if (levelsSnap && !levelsSnap.empty) {
+            const remoteLevels: SchoolLevel[] = [];
+            levelsSnap.forEach(d => remoteLevels.push({ ...d.data() as SchoolLevel, id: d.id }));
+            if (remoteLevels.length > 0) {
+              setLevels(remoteLevels);
+            }
+          }
+        } catch (hydrationErr) {
+          console.info('[Firestore] Initial live data hydration skipped:', hydrationErr);
+        }
       }
     });
 
@@ -960,16 +966,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (found) {
       setCurrentUser(found);
       setIsAuthenticated(true);
-      safeLocalStorageRemove(STORAGE_KEYS.LOGGED_OUT_EXPLICITLY);
       sessionStorage.setItem(STORAGE_KEYS.SESSION_ACTIVE, 'true');
       safeLocalStorageSet(STORAGE_KEYS.IS_LOGGED_IN, 'true');
       safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER_ID, found.id);
       setSelectedPlan(null);
-      if (found.role === 'admin' || found.role === 'academic_officer' || isCentralHQUser(found)) {
-        setSelectedCampusId('ALL');
-      } else if (found.campusId && found.campusId !== 'ALL') {
-        setSelectedCampusId(found.campusId);
-      }
       addAuditLog('USER_LOGIN', `Switched account session to ${found.name} (${found.role})`, found.id);
       showToast(`Switched account to ${found.name} (${found.role === 'admin' ? 'Principal / Admin' : found.role === 'academic_officer' ? 'Academic Officer' : found.title})`, 'info');
     }
@@ -1041,7 +1041,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setCurrentUser(found);
     setIsAuthenticated(true);
-    safeLocalStorageRemove(STORAGE_KEYS.LOGGED_OUT_EXPLICITLY);
     sessionStorage.setItem(STORAGE_KEYS.SESSION_ACTIVE, 'true');
     safeLocalStorageSet(STORAGE_KEYS.IS_LOGGED_IN, 'true');
     safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER_ID, found.id);
@@ -1051,7 +1050,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Campus Security Enforcement: Central HQ Staff can monitor all campuses
     const isCentral = isCentralHQUser(found);
     if (isCentral) {
-      setSelectedCampusId('ALL');
       showToast(`Welcome back, ${found.name}! Central HQ Staff monitoring active across all campuses.`, 'success');
     } else if (found.campusId && found.campusId !== 'ALL' && found.campusId !== selectedCampusId) {
       setSelectedCampusId(found.campusId);
@@ -1247,7 +1245,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     sessionStorage.removeItem(STORAGE_KEYS.SESSION_ACTIVE);
     safeLocalStorageRemove(STORAGE_KEYS.IS_LOGGED_IN);
     safeLocalStorageRemove(STORAGE_KEYS.CURRENT_USER_ID);
-    safeLocalStorageSet(STORAGE_KEYS.LOGGED_OUT_EXPLICITLY, 'true');
     showToast('Signed out of DCH Portal. Please sign in to access.', 'info');
   };
 
