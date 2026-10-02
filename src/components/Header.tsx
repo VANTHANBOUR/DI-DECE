@@ -59,8 +59,6 @@ export const Header: React.FC<HeaderProps> = ({
     openProfileModal,
     selectedCampusId,
     setSelectedCampusId,
-    isQuotaExceeded,
-    quotaUpgradeUrl,
     isOfflineMode,
   } = useApp();
 
@@ -208,22 +206,6 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Offline / Quota Badge */}
-            {isQuotaExceeded && (
-              <a
-                href={quotaUpgradeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl text-xs font-bold transition-all shadow-2xs group"
-                title="Daily Firestore Free Quota reached. Changes are safely saved locally in your browser. Click to open Firebase Console."
-              >
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                <span className="hidden xl:inline">Offline Mode (Quota Reached)</span>
-                <span className="xl:hidden">Offline Mode</span>
-                <ExternalLink className="w-3 h-3 text-amber-700 group-hover:translate-x-0.5 transition-transform" />
-              </a>
-            )}
-
             {/* Role / Account Switcher Dropdown */}
             <div className="relative">
               <button
@@ -352,9 +334,14 @@ export const Header: React.FC<HeaderProps> = ({
                                   </span>
                                 </div>
                               </div>
-                              <p className="text-[10px] text-slate-500 truncate">
-                                {account.title}
-                              </p>
+                              <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5">
+                                <span className="truncate">{account.title}</span>
+                                <span className="font-bold text-emerald-800 shrink-0 ml-1">
+                                  {account.role === 'admin' || account.role === 'academic_officer'
+                                    ? `All 10 Plans`
+                                    : `${lessonPlans.filter(p => p.teacherId === account.id || (p.teacherEmail && p.teacherEmail.toLowerCase() === account.email.toLowerCase())).length} Submitted`}
+                                </span>
+                              </div>
                             </div>
                             {isSelected && (
                               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />

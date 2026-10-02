@@ -43,8 +43,6 @@ export const AuthGate: React.FC = () => {
     showToast,
     firebaseConfigInfo,
     isFirebaseConnected,
-    isQuotaExceeded,
-    quotaUpgradeUrl,
     isOfflineMode,
     selectedCampusId,
     setSelectedCampusId,
@@ -168,6 +166,8 @@ export const AuthGate: React.FC = () => {
     try {
       if (acc.role === 'admin' || acc.role === 'academic_officer') {
         setSelectedCampusId('ALL');
+      } else if (acc.campusId && acc.campusId !== 'ALL') {
+        setSelectedCampusId(acc.campusId);
       }
       await signIn(acc.email, 'password123');
     } finally {
@@ -356,37 +356,6 @@ export const AuthGate: React.FC = () => {
 
               {/* Form Content */}
               <div className="p-5 sm:p-6 space-y-5">
-
-                {/* Quota Exceeded / Offline Notice */}
-                {isQuotaExceeded && (
-                  <div className="p-3.5 bg-amber-50 border border-amber-300/80 rounded-2xl text-amber-950 text-xs flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center shrink-0 text-amber-800">
-                      <Database className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-extrabold text-amber-900">Firestore Daily Free Quota Reached</p>
-                        <span className="text-[10px] font-black uppercase px-1.5 py-0.5 rounded bg-amber-200 text-amber-900">
-                          Resets Daily
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-amber-800/90 mt-0.5 leading-relaxed">
-                        Operating in offline local storage mode. All demo accounts, credentials, lesson plans, and edits remain accessible and save safely to your browser.
-                      </p>
-                      {quotaUpgradeUrl && (
-                        <a 
-                          href={quotaUpgradeUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 hover:text-emerald-950 underline mt-1.5"
-                        >
-                          <span>Open Firebase Console Quota & Upgrade Dialog</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
                 
                 {/* Google Sign In Action */}
                 <div className="space-y-2">

@@ -39,7 +39,8 @@ import {
   Image as ImageIcon,
   Printer,
   Copy,
-  Check
+  Check,
+  Database
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -67,7 +68,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
     openSignUpModal,
     schoolProfile,
     formatAgeGroup,
-    selectedCampusId
+    selectedCampusId,
+    pullDataFromFirestore,
+    isSyncingLive,
   } = useApp();
 
   const [activeSubTab, setActiveSubTab] = useState<'users' | 'plans' | 'classrooms' | 'logs' | 'profile'>('users');
@@ -111,10 +114,8 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   const [editingClass, setEditingClass] = useState<Classroom | null>(null);
   const [isClassroomModalOpen, setIsClassroomModalOpen] = useState(false);
 
-  // Filtered Users: Admins/Super Admins see all staff accounts; regular users see only their own account
-  const userBase = isSuperOrAdmin 
-    ? allAccounts 
-    : allAccounts.filter(u => u.id === currentUser?.id || (u.email && u.email.toLowerCase() === currentUser?.email.toLowerCase()));
+  // Faculty & Staff Directory: Show all active accounts across campuses for institutional collaboration
+  const userBase = allAccounts;
 
   const filteredUsers = userBase.filter((u) => {
     if (selectedConsoleCampus !== 'all') {
@@ -244,40 +245,54 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
             </p>
           </div>
 
-          {isSuperOrAdmin && (
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                onClick={() => setIsSignUpControlOpen(true)}
-                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-800/90 hover:bg-emerald-800 text-white font-bold text-xs rounded-2xl shadow-sm border border-emerald-500/40 transition-all active:scale-95"
-              >
-                {schoolProfile?.globalSignUpDisabled ? (
-                  <EyeOff className="w-4 h-4 text-rose-300" />
-                ) : (
-                  <Eye className="w-4 h-4 text-emerald-300" />
-                )}
-                <span>Hide / Display Sign Up</span>
-                {schoolProfile?.globalSignUpDisabled ? (
-                  <span className="px-2 py-0.5 text-[10px] bg-rose-500 text-white rounded-full font-black">
-                    Hidden All
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 text-[10px] bg-amber-400 text-slate-950 rounded-full font-black">
-                    {Object.values(schoolProfile?.disabledSignUpCampuses || {}).filter(Boolean).length > 0 
-                      ? `${Object.values(schoolProfile?.disabledSignUpCampuses || {}).filter(Boolean).length} Hidden` 
-                      : 'Active All'}
-                  </span>
-                )}
-              </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => pullDataFromFirestore(true)}
+              disabled={isSyncingLive}
+              className={`flex items-center gap-2 px-4 py-2.5 bg-emerald-900/90 hover:bg-emerald-800 text-white font-bold text-xs rounded-2xl shadow-sm border border-emerald-500/40 transition-all active:scale-95 ${
+                isSyncingLive ? 'animate-pulse cursor-wait' : 'cursor-pointer'
+              }`}
+              title="Pull latest live data from Cloud Firestore for all users, plans, and classrooms"
+            >
+              <Database className={`w-4 h-4 text-emerald-300 ${isSyncingLive ? 'animate-spin' : ''}`} />
+              <span>{isSyncingLive ? 'Pulling from Cloud...' : 'Pull Firestore Data'}</span>
+            </button>
 
-              <button
-                onClick={openSignUpModal}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#007A43] hover:bg-[#006338] text-white font-bold text-xs rounded-2xl shadow-sm transition-all active:scale-95"
-              >
-                <UserPlus className="w-4 h-4 text-amber-300" />
-                <span>Create New Staff Account</span>
-              </button>
-            </div>
-          )}
+            {isSuperOrAdmin && (
+              <>
+                <button
+                  onClick={() => setIsSignUpControlOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-emerald-800/90 hover:bg-emerald-800 text-white font-bold text-xs rounded-2xl shadow-sm border border-emerald-500/40 transition-all active:scale-95"
+                >
+                  {schoolProfile?.globalSignUpDisabled ? (
+                    <EyeOff className="w-4 h-4 text-rose-300" />
+                  ) : (
+                    <Eye className="w-4 h-4 text-emerald-300" />
+                  )}
+                  <span>Hide / Display Sign Up</span>
+                  {schoolProfile?.globalSignUpDisabled ? (
+                    <span className="px-2 py-0.5 text-[10px] bg-rose-500 text-white rounded-full font-black">
+                      Hidden All
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 text-[10px] bg-amber-400 text-slate-950 rounded-full font-black">
+                      {Object.values(schoolProfile?.disabledSignUpCampuses || {}).filter(Boolean).length > 0 
+                        ? `${Object.values(schoolProfile?.disabledSignUpCampuses || {}).filter(Boolean).length} Hidden` 
+                        : 'Active All'}
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  onClick={openSignUpModal}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-[#007A43] hover:bg-[#006338] text-white font-bold text-xs rounded-2xl shadow-sm transition-all active:scale-95"
+                >
+                  <UserPlus className="w-4 h-4 text-amber-300" />
+                  <span>Create New Staff Account</span>
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

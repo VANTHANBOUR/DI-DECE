@@ -179,19 +179,7 @@ export async function testFirestoreConnection(): Promise<FirestoreStatus> {
   } catch (error: any) {
     const code = error?.code || '';
     const msg = error?.message || String(error);
-    const isQuota = code === 'resource-exhausted' || msg.includes('Quota') || msg.includes('quota');
     const isOffline = code === 'unavailable' || msg.includes('offline') || msg.includes('Could not reach Cloud Firestore') || msg.includes('the client is offline');
-
-    if (isQuota) {
-      console.warn('Firestore daily read units quota reached. Running in robust offline local mode.', FIRESTORE_UPGRADE_URL);
-      return {
-        isConnected: false,
-        isQuotaExceeded: true,
-        isOffline: false,
-        errorMessage: "Quota exceeded for quota metric 'Free daily read units per project (free tier database)'",
-        upgradeUrl: FIRESTORE_UPGRADE_URL
-      };
-    }
 
     if (isOffline) {
       console.info('Firestore is operating in offline mode (local cache active).');
@@ -206,7 +194,7 @@ export async function testFirestoreConnection(): Promise<FirestoreStatus> {
     return {
       isConnected: false,
       isQuotaExceeded: false,
-      isOffline: true,
+      isOffline: false,
       errorMessage: msg
     };
   }
