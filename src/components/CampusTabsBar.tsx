@@ -143,10 +143,10 @@ export const CampusTabsBar: React.FC<CampusTabsBarProps> = ({
                 </div>
                 <div className="text-center w-full">
                   <span className="text-xs font-black block tracking-tight line-clamp-1">
-                    {campus.shortName}
+                    {campus.id === 'ALL' ? 'Central HQ (All 10 Plans)' : campus.shortName}
                   </span>
                   <span className={`text-[9px] block mt-0.5 truncate ${isSelected ? 'text-emerald-100' : 'text-slate-400'}`}>
-                    {campus.location}
+                    {campus.id === 'ALL' ? 'All Campuses Overview' : campus.location}
                   </span>
                 </div>
               </button>
@@ -194,7 +194,7 @@ export const CampusTabsBar: React.FC<CampusTabsBarProps> = ({
                   <School className={`w-3.5 h-3.5 ${isSelected ? 'text-amber-300' : 'text-emerald-600'}`} />
                 )}
                 
-                <span>{campus.shortName}</span>
+                <span>{campus.id === 'ALL' ? 'Central HQ (All 10 Plans)' : campus.shortName}</span>
 
                 {isTeacher && !isRegistered ? (
                   <Lock className="w-3 h-3 text-amber-600 ml-0.5" />

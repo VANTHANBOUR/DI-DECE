@@ -385,12 +385,12 @@ export const isCentralHQUser = (user?: UserAccount | null): boolean => {
  */
 export const isAdminOrSuperAdmin = (user?: UserAccount | null): boolean => {
   if (!user) return false;
-  if (user.role === 'admin' || (user.role as string) === 'super_admin') return true;
+  if (user.role === 'admin' || (user.role as string) === 'super_admin' || user.role === 'academic_officer') return true;
   const email = (user.email || '').trim().toLowerCase();
   if (email === 'vanthanbour@diu.edu.kh') return true;
-  if (email.includes('admin') || email.includes('principal') || email.includes('superadmin')) return true;
+  if (email.includes('admin') || email.includes('principal') || email.includes('superadmin') || email.includes('academic') || email.includes('officer')) return true;
   const title = (user.title || '').toLowerCase();
-  if (title.includes('admin') || title.includes('principal') || title.includes('super admin') || title.includes('superintendent') || title.includes('founder')) {
+  if (title.includes('admin') || title.includes('principal') || title.includes('super admin') || title.includes('superintendent') || title.includes('founder') || title.includes('academic') || title.includes('officer')) {
     return true;
   }
   return false;

@@ -495,14 +495,56 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4500);
   };
 
-  // Test Firebase Firestore Connection on Mount & listen to Auth
+  // Test Firebase Firestore Connection on Mount, load live cloud data & listen to Auth
   useEffect(() => {
-    testFirestoreConnection().then(status => {
+    testFirestoreConnection().then(async (status) => {
       setIsFirebaseConnected(status.isConnected);
       setIsQuotaExceeded(status.isQuotaExceeded);
       setIsOfflineMode(status.isOffline || status.isQuotaExceeded);
       if (status.errorMessage) {
         setFirestoreStatusMessage(status.errorMessage);
+      }
+
+      if (status.isConnected && !status.isQuotaExceeded) {
+        try {
+          const [plansSnap, classroomsSnap, profileSnap, levelsSnap] = await Promise.all([
+            getDocs(collection(db, 'lessonPlans')).catch(() => null),
+            getDocs(collection(db, 'classrooms')).catch(() => null),
+            getDoc(doc(db, 'settings', 'schoolProfile')).catch(() => null),
+            getDocs(collection(db, 'levels')).catch(() => null),
+          ]);
+
+          if (plansSnap && !plansSnap.empty) {
+            const remotePlans: LessonPlan[] = [];
+            plansSnap.forEach(d => remotePlans.push({ ...d.data() as LessonPlan, id: d.id }));
+            if (remotePlans.length > 0) {
+              setLessonPlans(remotePlans);
+            }
+          }
+
+          if (classroomsSnap && !classroomsSnap.empty) {
+            const remoteClassrooms: Classroom[] = [];
+            classroomsSnap.forEach(d => remoteClassrooms.push({ ...d.data() as Classroom, id: d.id }));
+            if (remoteClassrooms.length > 0) {
+              setClassrooms(remoteClassrooms);
+            }
+          }
+
+          if (profileSnap && profileSnap.exists()) {
+            const remoteProfile = profileSnap.data() as SchoolProfile;
+            setSchoolProfile(prev => ({ ...prev, ...remoteProfile }));
+          }
+
+          if (levelsSnap && !levelsSnap.empty) {
+            const remoteLevels: SchoolLevel[] = [];
+            levelsSnap.forEach(d => remoteLevels.push({ ...d.data() as SchoolLevel, id: d.id }));
+            if (remoteLevels.length > 0) {
+              setLevels(remoteLevels);
+            }
+          }
+        } catch (hydrationErr) {
+          console.info('[Firestore] Initial live data hydration skipped:', hydrationErr);
+        }
       }
     });
 
