@@ -74,6 +74,7 @@ interface AppContextType {
   lastSyncedAt: string | null;
   pushLiveUpdate: (customMessage?: string) => Promise<void>;
   forceCloudSync: () => Promise<void>;
+  pullCloudData: (showNotification?: boolean) => Promise<void>;
   
   // Auth Modal Controls
   isAuthModalOpen: boolean;
@@ -495,6 +496,104 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4500);
   };
 
+  // Pull all live data from Cloud Firestore database
+  const pullCloudData = useCallback(async (showNotification = true) => {
+    setIsSyncingLive(true);
+    try {
+      const [plansSnap, classroomsSnap, profileSnap, levelsSnap, usersSnap] = await Promise.all([
+        getDocs(collection(db, 'lessonPlans')).catch(() => null),
+        getDocs(collection(db, 'classrooms')).catch(() => null),
+        getDoc(doc(db, 'settings', 'schoolProfile')).catch(() => null),
+        getDocs(collection(db, 'levels')).catch(() => null),
+        getDocs(collection(db, 'users')).catch(() => null),
+      ]);
+
+      let pulledPlansCount = 0;
+
+      if (plansSnap && !plansSnap.empty) {
+        const remotePlans: LessonPlan[] = [];
+        plansSnap.forEach(d => remotePlans.push({ ...(d.data() as LessonPlan), id: d.id }));
+        if (remotePlans.length > 0) {
+          setLessonPlans(remotePlans);
+          safeLocalStorageSet(STORAGE_KEYS.LESSON_PLANS, JSON.stringify(remotePlans));
+          pulledPlansCount = remotePlans.length;
+        }
+      }
+
+      if (classroomsSnap && !classroomsSnap.empty) {
+        const remoteClassrooms: Classroom[] = [];
+        classroomsSnap.forEach(d => remoteClassrooms.push({ ...(d.data() as Classroom), id: d.id }));
+        if (remoteClassrooms.length > 0) {
+          setClassrooms(remoteClassrooms);
+          safeLocalStorageSet(STORAGE_KEYS.CLASSROOMS, JSON.stringify(remoteClassrooms));
+        }
+      }
+
+      if (profileSnap && profileSnap.exists()) {
+        const remoteProfile = profileSnap.data() as SchoolProfile;
+        setSchoolProfile(prev => {
+          const merged = { ...prev, ...remoteProfile };
+          safeLocalStorageSet(STORAGE_KEYS.SCHOOL_PROFILE, JSON.stringify(merged));
+          return merged;
+        });
+      }
+
+      if (levelsSnap && !levelsSnap.empty) {
+        const remoteLevels: SchoolLevel[] = [];
+        levelsSnap.forEach(d => remoteLevels.push({ ...(d.data() as SchoolLevel), id: d.id }));
+        if (remoteLevels.length > 0) {
+          setLevels(remoteLevels);
+          safeLocalStorageSet(STORAGE_KEYS.LEVELS, JSON.stringify(remoteLevels));
+        }
+      }
+
+      if (usersSnap && !usersSnap.empty) {
+        const remoteUsers: UserAccount[] = [];
+        usersSnap.forEach(d => remoteUsers.push({ ...(d.data() as UserAccount), id: d.id }));
+        if (remoteUsers.length > 0) {
+          setAllAccounts(prev => {
+            const map = new Map<string, UserAccount>();
+            prev.forEach(u => map.set(u.id, u));
+            remoteUsers.forEach(u => {
+              const existing = map.get(u.id);
+              map.set(u.id, { ...existing, ...u });
+            });
+            const merged = Array.from(map.values());
+            safeLocalStorageSet(STORAGE_KEYS.ACCOUNTS, JSON.stringify(merged));
+            return merged;
+          });
+        }
+      }
+
+      const now = new Date().toISOString();
+      setLastSyncedAt(now);
+      setIsFirebaseConnected(true);
+      setIsOfflineMode(false);
+      if (showNotification) {
+        showToast(`Pulled ${pulledPlansCount} lesson plans & data from Cloud Firestore!`, 'success');
+      }
+    } catch (err: any) {
+      const code = err?.code || '';
+      const msg = err?.message || String(err);
+      if (code === 'resource-exhausted' || msg.includes('Quota') || msg.includes('quota')) {
+        setIsQuotaExceeded(true);
+        setIsFirebaseConnected(false);
+        setIsOfflineMode(true);
+        setFirestoreStatusMessage("Quota exceeded for quota metric 'Free daily read units per project (free tier database)'");
+        if (showNotification) {
+          showToast("Daily Firestore free read limit reached. Operating in local offline mode.", 'warning');
+        }
+      } else {
+        console.warn('[Firestore] Pull data notice:', err);
+        if (showNotification) {
+          showToast('Unable to pull from Firestore: ' + (err?.message || 'Network notice'), 'error');
+        }
+      }
+    } finally {
+      setIsSyncingLive(false);
+    }
+  }, []);
+
   // Test Firebase Firestore Connection on Mount, load live cloud data & listen to Auth
   useEffect(() => {
     testFirestoreConnection().then(async (status) => {
@@ -506,45 +605,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (status.isConnected && !status.isQuotaExceeded) {
-        try {
-          const [plansSnap, classroomsSnap, profileSnap, levelsSnap] = await Promise.all([
-            getDocs(collection(db, 'lessonPlans')).catch(() => null),
-            getDocs(collection(db, 'classrooms')).catch(() => null),
-            getDoc(doc(db, 'settings', 'schoolProfile')).catch(() => null),
-            getDocs(collection(db, 'levels')).catch(() => null),
-          ]);
-
-          if (plansSnap && !plansSnap.empty) {
-            const remotePlans: LessonPlan[] = [];
-            plansSnap.forEach(d => remotePlans.push({ ...d.data() as LessonPlan, id: d.id }));
-            if (remotePlans.length > 0) {
-              setLessonPlans(remotePlans);
-            }
-          }
-
-          if (classroomsSnap && !classroomsSnap.empty) {
-            const remoteClassrooms: Classroom[] = [];
-            classroomsSnap.forEach(d => remoteClassrooms.push({ ...d.data() as Classroom, id: d.id }));
-            if (remoteClassrooms.length > 0) {
-              setClassrooms(remoteClassrooms);
-            }
-          }
-
-          if (profileSnap && profileSnap.exists()) {
-            const remoteProfile = profileSnap.data() as SchoolProfile;
-            setSchoolProfile(prev => ({ ...prev, ...remoteProfile }));
-          }
-
-          if (levelsSnap && !levelsSnap.empty) {
-            const remoteLevels: SchoolLevel[] = [];
-            levelsSnap.forEach(d => remoteLevels.push({ ...d.data() as SchoolLevel, id: d.id }));
-            if (remoteLevels.length > 0) {
-              setLevels(remoteLevels);
-            }
-          }
-        } catch (hydrationErr) {
-          console.info('[Firestore] Initial live data hydration skipped:', hydrationErr);
-        }
+        await pullCloudData(false);
       }
     });
 
@@ -2034,6 +2095,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lastSyncedAt,
         pushLiveUpdate,
         forceCloudSync,
+        pullCloudData,
         isAuthModalOpen,
         setIsAuthModalOpen,
         authModalMode,
