@@ -95,6 +95,7 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({ user
   const [bio, setBio] = useState(user.bio || '');
   const [avatar, setAvatar] = useState(user.avatar);
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const processFile = (file: File) => {
@@ -190,13 +191,18 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({ user
     onClose();
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (isSelf) {
       showToast('You cannot remove your own active admin account session.', 'warning');
       return;
     }
-    deleteAccount(user.id);
-    onClose();
+    setIsDeleting(true);
+    try {
+      await deleteAccount(user.id);
+      onClose();
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -239,7 +245,7 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({ user
               <div>
                 <h3 className="text-sm font-black text-rose-950">Confirm Permanent Removal of Staff</h3>
                 <p className="text-xs text-rose-800 mt-1 leading-relaxed">
-                  You are about to remove <strong className="text-rose-950">{user.name}</strong> ({user.title}) from the staff directory.
+                  You are about to remove <strong className="text-rose-950">{user.name}</strong> ({user.title}) and permanently delete their account record and access credentials from the database.
                   {userPlansCount > 0 && (
                     <span className="block mt-1 font-semibold text-rose-900">
                       ⚠️ Note: This staff member has authored {userPlansCount} lesson plan(s) in the system.
@@ -252,18 +258,29 @@ export const StaffManagementModal: React.FC<StaffManagementModalProps> = ({ user
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
+                disabled={isDeleting}
                 onClick={() => setIsConfirmingDelete(false)}
-                className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl"
+                className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl disabled:opacity-50"
               >
                 Keep Account
               </button>
               <button
                 type="button"
+                disabled={isDeleting}
                 onClick={handleDelete}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-extrabold rounded-xl shadow-sm flex items-center gap-1.5"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 text-white text-xs font-extrabold rounded-xl shadow-sm flex items-center gap-1.5 transition-colors"
               >
-                <Trash2 className="w-4 h-4" />
-                <span>Confirm Removal</span>
+                {isDeleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Deleting from database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>Confirm Removal & Delete from Database</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

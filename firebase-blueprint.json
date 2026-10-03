@@ -111,6 +111,17 @@
         "khmerName": { "type": "string", "maxLength": 100 }
       },
       "required": ["id", "name", "displayName"]
+    },
+    "DeletedAccount": {
+      "title": "Deleted Account Tombstone",
+      "description": "Deleted user account identifier for cross-device deletion synchronization",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "deletedAt": { "type": "string" },
+        "email": { "type": "string", "maxLength": 150 }
+      },
+      "required": ["id", "deletedAt"]
     }
   },
   "firestore": {
@@ -137,6 +148,10 @@
     "/levels/{levelId}": {
       "schema": { "$ref": "#/entities/SchoolLevel" },
       "description": "Classroom grade and age tier definitions"
+    },
+    "/deletedAccounts/{userId}": {
+      "schema": { "$ref": "#/entities/DeletedAccount" },
+      "description": "Tombstones for deleted accounts"
     }
   }
 }

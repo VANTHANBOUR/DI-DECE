@@ -104,6 +104,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   // Deletion confirmations
   const [planToDelete, setPlanToDelete] = useState<LessonPlan | null>(null);
   const [userToDelete, setUserToDelete] = useState<UserAccount | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState<boolean>(false);
 
   const isSuperOrAdmin = isAdminOrSuperAdmin(currentUser);
 
@@ -210,10 +211,15 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
     }
   };
 
-  const confirmDeleteUser = () => {
+  const confirmDeleteUser = async () => {
     if (userToDelete) {
-      deleteAccount(userToDelete.id);
-      setUserToDelete(null);
+      setIsDeletingUser(true);
+      try {
+        await deleteAccount(userToDelete.id);
+      } finally {
+        setIsDeletingUser(false);
+        setUserToDelete(null);
+      }
     }
   };
 
@@ -1231,24 +1237,35 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Are you sure you want to remove <strong className="text-slate-900">{userToDelete.name}</strong> from Dewey Kindergarten? Their credentials and access to the portal will be terminated immediately.
+              Are you sure you want to remove <strong className="text-slate-900">{userToDelete.name}</strong> from Dewey Kindergarten? Their credentials, portal access, and account record will be permanently deleted from the database.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
               <button
                 type="button"
+                disabled={isDeletingUser}
                 onClick={() => setUserToDelete(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
+                disabled={isDeletingUser}
                 onClick={confirmDeleteUser}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors"
               >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Remove Staff</span>
+                {isDeletingUser ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Deleting from database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Account From Database</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

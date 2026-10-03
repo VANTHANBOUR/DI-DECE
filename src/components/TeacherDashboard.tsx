@@ -236,7 +236,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 Action Required: {revisionCount} Lesson Plan(s) Need Revision
               </p>
               <p className="text-[11px] text-amber-800">
-                Principal Madam Sopheak has requested minor curriculum or safety updates. Review the feedback and resubmit.
+                Academic Review Officer Mr. Piseth Vanthan has requested minor curriculum or safety updates. Review the feedback and resubmit.
               </p>
             </div>
           </div>

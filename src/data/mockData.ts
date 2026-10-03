@@ -3,24 +3,6 @@ import { MASTER_LESSON_PLANS } from './lessonPlansData';
 
 export const INITIAL_ACCOUNTS: UserAccount[] = [
   {
-    id: 'admin_principal',
-    name: 'Madam Sopheak Rath',
-    khmerName: 'លោកស្រី រ័ត្ន សុភ័ក្រ្ត',
-    email: 'principal.sopheak@deweychildcare.edu.kh',
-    password: 'password123',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    role: 'admin',
-    title: 'School Principal & Academic Director',
-    campusId: 'ALL',
-    campusName: 'Central HQ',
-    registeredCampusIds: ['ALL', 'DCH_SYW', 'DCH_SESSOR', 'DCH_BMC', 'DK_ROMCHEK_4', 'DK_BOREY_ROMCHEK', 'DK_OCHAR', 'DK_BMC'],
-    phone: '+855 (0) 23 888 777',
-    roomNumber: 'Office A-101 (Central HQ Wing)',
-    joinedYear: '2019',
-    status: 'active',
-    bio: 'Oversees Early Childhood Curriculum standards, Trilingual pedagogy, EYFS compliance, and academic monitoring across all 7 Dewey campuses.',
-  },
-  {
     id: 'officer_piseth',
     name: 'Mr. Piseth Vanthan',
     khmerName: 'លោក វ៉ាន់ថាន់ ពិសិដ្ឋ',
@@ -188,9 +170,9 @@ export const INITIAL_AUDIT_LOGS: SystemAuditLog[] = [
   {
     id: 'log_1',
     timestamp: '2026-08-26 09:40',
-    actorId: 'admin_principal',
-    actorName: 'Madam Sopheak Rath',
-    actorRole: 'admin',
+    actorId: 'officer_piseth',
+    actorName: 'Mr. Piseth Vanthan',
+    actorRole: 'academic_officer',
     action: 'REVISE_PLAN',
     details: 'Requested revisions on David Miller\'s Week 12 K2 Architecture plan regarding toothpick safety.',
     targetId: 'lp_2026_w12_david',

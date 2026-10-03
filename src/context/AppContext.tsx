@@ -33,7 +33,9 @@ import {
   deleteDoc, 
   updateDoc,
   serverTimestamp,
-  onSnapshot 
+  onSnapshot,
+  query,
+  where
 } from 'firebase/firestore';
 
 export type NavigationTab = 
@@ -57,7 +59,7 @@ interface AppContextType {
   signInWithGoogle: () => Promise<boolean>;
   signOut: () => Promise<void>;
   updateAccount: (userId: string, updates: Partial<UserAccount>) => void;
-  deleteAccount: (userId: string) => void;
+  deleteAccount: (userId: string) => Promise<boolean>;
   registerTeacher: (teacherData: Partial<UserAccount>) => Promise<UserAccount | null>;
   
   // Firebase State & Live Cloud Push
@@ -160,6 +162,7 @@ const STORAGE_KEYS = {
   CURRENT_USER_ID: 'dch_current_user_id_v6',
   LOGGED_OUT_EXPLICITLY: 'dch_logged_out_explicitly_v6',
   ACCOUNTS: 'dch_accounts_v6',
+  DELETED_ACCOUNTS: 'dch_deleted_accounts_v6',
   LESSON_PLANS: 'dch_lesson_plans_v6',
   CLASSROOMS: 'dch_classrooms_v6',
   AUDIT_LOGS: 'dch_audit_logs_v6',
@@ -248,6 +251,32 @@ const safeLocalStorageRemove = (key: string): void => {
   } catch {}
 };
 
+// Permanent deleted accounts register to guarantee deleted users never resurrect from seeds or cache
+const getDeletedUserIds = (): Set<string> => {
+  try {
+    const saved = safeLocalStorageGet(STORAGE_KEYS.DELETED_ACCOUNTS);
+    if (saved) {
+      const arr = JSON.parse(saved);
+      if (Array.isArray(arr)) {
+        const s = new Set<string>(arr.map((item: string) => String(item).toLowerCase().trim()));
+        s.add('admin_principal');
+        s.add('principal.sopheak@deweychildcare.edu.kh');
+        return s;
+      }
+    }
+  } catch {}
+  return new Set<string>(['admin_principal', 'principal.sopheak@deweychildcare.edu.kh']);
+};
+
+const addDeletedUserId = (idOrEmail: string): void => {
+  if (!idOrEmail) return;
+  try {
+    const set = getDeletedUserIds();
+    set.add(idOrEmail.toLowerCase().trim());
+    safeLocalStorageSet(STORAGE_KEYS.DELETED_ACCOUNTS, JSON.stringify(Array.from(set)));
+  } catch {}
+};
+
 const DEFAULT_LEVELS: SchoolLevel[] = [
   { id: 'lvl_toddlers', name: 'Pre-Nursery', displayName: 'Pre-Nursery', khmerName: 'ថ្នាក់កូនក្មេង' },
   { id: 'lvl_nursery', name: 'Nursery', displayName: 'Nursery', khmerName: 'ថ្នាក់មត្តេយ្យទាប' },
@@ -333,25 +362,45 @@ const processImageFileToDataUrl = (file: File): Promise<string> => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Accounts - Always merge all INITIAL_ACCOUNTS so all teachers & Central HQ officers are present
+  // Accounts - Always merge all INITIAL_ACCOUNTS so all teachers & Central HQ officers are present (excluding any removed accounts)
   const [allAccounts, setAllAccounts] = useState<UserAccount[]>(() => {
     try {
+      const deletedIds = getDeletedUserIds();
       const saved = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           const map = new Map<string, UserAccount>();
-          INITIAL_ACCOUNTS.forEach(a => map.set(a.id, a));
+          INITIAL_ACCOUNTS.forEach(a => {
+            const idKey = a.id.toLowerCase();
+            const emailKey = (a.email || '').toLowerCase().trim();
+            if (!deletedIds.has(idKey) && !deletedIds.has(emailKey) && !a.name.includes('Sopheak')) {
+              map.set(a.id, a);
+            }
+          });
           parsed.forEach((a: UserAccount) => {
+            const idKey = a.id.toLowerCase();
+            const emailKey = (a.email || '').toLowerCase().trim();
+            if (deletedIds.has(idKey) || deletedIds.has(emailKey) || (a.name && a.name.includes('Sopheak'))) {
+              return;
+            }
             const existing = map.get(a.id);
             map.set(a.id, { ...existing, ...a });
           });
-          return Array.from(map.values());
+          return Array.from(map.values()).filter(a => {
+            const idKey = a.id.toLowerCase();
+            const emailKey = (a.email || '').toLowerCase().trim();
+            return !deletedIds.has(idKey) && !deletedIds.has(emailKey) && !a.name?.includes('Sopheak');
+          });
         }
       }
-      return INITIAL_ACCOUNTS;
+      return INITIAL_ACCOUNTS.filter(a => {
+        const idKey = a.id.toLowerCase();
+        const emailKey = (a.email || '').toLowerCase().trim();
+        return !deletedIds.has(idKey) && !deletedIds.has(emailKey) && !a.name?.includes('Sopheak');
+      });
     } catch {
-      return INITIAL_ACCOUNTS;
+      return INITIAL_ACCOUNTS.filter(a => a.id !== 'admin_principal');
     }
   });
 
@@ -379,15 +428,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       const userId = safeLocalStorageGet(STORAGE_KEYS.CURRENT_USER_ID);
       const saved = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
-      const accounts: UserAccount[] = saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
-      if (userId) {
+      const rawAccounts: UserAccount[] = saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
+      const accounts = rawAccounts.filter(a => a.id !== 'admin_principal' && !a.name?.includes('Sopheak') && !a.email?.toLowerCase().includes('principal.sopheak'));
+      if (userId && userId !== 'admin_principal') {
         const found = accounts.find(a => a.id === userId);
         if (found) return found;
       }
       // Default to Mr. Piseth Vanthan (officer_piseth, vanthanbour@diu.edu.kh)
-      return accounts.find(a => a.email === 'vanthanbour@diu.edu.kh') || INITIAL_ACCOUNTS[1] || INITIAL_ACCOUNTS[0];
+      return accounts.find(a => a.email === 'vanthanbour@diu.edu.kh') || accounts[0] || INITIAL_ACCOUNTS[0];
     } catch {
-      return INITIAL_ACCOUNTS[1] || INITIAL_ACCOUNTS[0];
+      return INITIAL_ACCOUNTS[0];
     }
   });
 
@@ -536,6 +586,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Test Firebase Firestore Connection on Mount & listen to Auth
   useEffect(() => {
+    // Ensure Madam Sopheak Rath is completely removed from localStorage and Firestore database
+    try {
+      const savedAccountsStr = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
+      if (savedAccountsStr && (savedAccountsStr.includes('admin_principal') || savedAccountsStr.includes('Sopheak'))) {
+        const parsed = JSON.parse(savedAccountsStr);
+        const filtered = parsed.filter((a: any) => a.id !== 'admin_principal' && !a.name?.includes('Sopheak') && !a.email?.toLowerCase().includes('principal.sopheak'));
+        safeLocalStorageSet(STORAGE_KEYS.ACCOUNTS, JSON.stringify(filtered));
+      }
+      const activeUser = safeLocalStorageGet(STORAGE_KEYS.CURRENT_USER_ID);
+      if (activeUser === 'admin_principal') {
+        safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER_ID, 'officer_piseth');
+      }
+      deleteDoc(doc(db, 'users', 'admin_principal')).catch(() => {});
+    } catch {}
+
     testFirestoreConnection().then(status => {
       setIsFirebaseConnected(status.isConnected);
       setIsQuotaExceeded(false);
@@ -663,6 +728,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } else if (type === 'ACCOUNTS_UPDATED') {
             const accounts = data as UserAccount[];
             setAllAccounts(accounts);
+          } else if (type === 'ACCOUNT_DELETED') {
+            const { userId, email } = (data || {}) as { userId: string; email?: string };
+            if (userId) {
+              addDeletedUserId(userId);
+              if (email) addDeletedUserId(email);
+              setAllAccounts(prev => prev.filter(a => a.id !== userId && a.email?.toLowerCase() !== email?.toLowerCase()));
+            }
           } else if (type === 'FORCE_SYNC_TRIGGERED') {
             if (data?.timestamp) {
               setLastSyncedAt(data.timestamp);
@@ -689,6 +761,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else if (e.key === STORAGE_KEYS.ACCOUNTS) {
           const acc = JSON.parse(e.newValue);
           setAllAccounts(acc);
+        } else if (e.key === STORAGE_KEYS.DELETED_ACCOUNTS) {
+          const deletedIds = getDeletedUserIds();
+          setAllAccounts(prev => prev.filter(a => !deletedIds.has(a.id.toLowerCase()) && !deletedIds.has(a.email?.toLowerCase())));
         }
       } catch {}
     };
@@ -854,15 +929,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
         if (!snapshot.empty) {
+          const deletedIds = getDeletedUserIds();
           const remoteUsers: UserAccount[] = [];
           snapshot.forEach(docSnap => {
             const docData = docSnap.data() as UserAccount;
+            const docId = docSnap.id.toLowerCase();
+            const docEmail = (docData.email || '').toLowerCase().trim();
+            if (deletedIds.has(docId) || deletedIds.has(docEmail) || docSnap.id === 'admin_principal' || (docData.name && docData.name.includes('Sopheak'))) {
+              try {
+                deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
+              } catch {}
+              return;
+            }
             remoteUsers.push({ ...docData, id: docSnap.id });
           });
           setAllAccounts(prev => {
             const map = new Map<string, UserAccount>();
-            prev.forEach(u => map.set(u.id, u));
+            prev.filter(u => !deletedIds.has(u.id.toLowerCase()) && !deletedIds.has((u.email || '').toLowerCase().trim()) && !u.name?.includes('Sopheak')).forEach(u => map.set(u.id, u));
             remoteUsers.forEach(u => {
+              if (deletedIds.has(u.id.toLowerCase()) || deletedIds.has((u.email || '').toLowerCase().trim())) return;
               const existing = map.get(u.id);
               const originalPassword = u.password || existing?.password || (INITIAL_ACCOUNTS.find(a => a.id === u.id || a.email.toLowerCase() === u.email.toLowerCase())?.password);
               map.set(u.id, {
@@ -871,7 +956,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 ...(originalPassword ? { password: originalPassword } : {})
               });
             });
-            const merged = Array.from(map.values());
+            const merged = Array.from(map.values()).filter(u => !deletedIds.has(u.id.toLowerCase()) && !deletedIds.has((u.email || '').toLowerCase().trim()) && !u.name?.includes('Sopheak'));
             
             if (currentUser) {
               const freshCurrentUser = merged.find(u => u.id === currentUser.id);
@@ -887,6 +972,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       handleSnapshotError(e, 'users');
     }
 
+    // 9. Listen for real-time Deleted Accounts tombstones from Firestore
+    let unsubDeletedAccounts: (() => void) | null = null;
+    try {
+      unsubDeletedAccounts = onSnapshot(collection(db, 'deletedAccounts'), (snapshot) => {
+        if (!snapshot.empty) {
+          const currentDeleted = getDeletedUserIds();
+          let hasNew = false;
+          snapshot.forEach(docSnap => {
+            const idKey = docSnap.id.toLowerCase();
+            if (!currentDeleted.has(idKey)) {
+              currentDeleted.add(idKey);
+              hasNew = true;
+            }
+            const data = docSnap.data();
+            if (data?.email) {
+              const emailKey = String(data.email).toLowerCase().trim();
+              if (!currentDeleted.has(emailKey)) {
+                currentDeleted.add(emailKey);
+                hasNew = true;
+              }
+            }
+          });
+          if (hasNew) {
+            safeLocalStorageSet(STORAGE_KEYS.DELETED_ACCOUNTS, JSON.stringify(Array.from(currentDeleted)));
+            setAllAccounts(prev => prev.filter(u => !currentDeleted.has(u.id.toLowerCase()) && !currentDeleted.has((u.email || '').toLowerCase().trim())));
+          }
+        }
+      }, () => {});
+    } catch {}
+
     return () => {
       if (unsubPlans) unsubPlans();
       if (unsubClassrooms) unsubClassrooms();
@@ -894,6 +1009,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (unsubLogs) unsubLogs();
       if (unsubProfile) unsubProfile();
       if (unsubUsers) unsubUsers();
+      if (unsubDeletedAccounts) unsubDeletedAccounts();
       if (bc) bc.close();
       if (typeof window !== 'undefined') {
         window.removeEventListener('storage', handleStorageEvent);
@@ -1337,26 +1453,105 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Account details for ${updatedAccount.name} updated successfully`, 'success');
   };
 
-  const deleteAccount = (userId: string) => {
-    if (currentUser && userId === currentUser.id) {
+  const deleteAccount = async (userId: string): Promise<boolean> => {
+    if (currentUser && (userId === currentUser.id || (currentUser.email && userId.toLowerCase() === currentUser.email.toLowerCase()))) {
       showToast('You cannot delete your own active session account.', 'warning');
-      return;
+      return false;
     }
-    const target = allAccounts.find(a => a.id === userId);
+    const target = allAccounts.find(a => a.id === userId || (a.email && a.email.toLowerCase() === userId.toLowerCase()));
+    const targetId = target?.id || userId;
+    const targetEmail = (target?.email || '').toLowerCase().trim();
+    const targetName = target?.name || 'Staff Member';
+
+    // 1. Immediately register in permanent deletion registry (localStorage)
+    addDeletedUserId(targetId);
+    if (userId && userId !== targetId) addDeletedUserId(userId);
+    if (targetEmail) addDeletedUserId(targetEmail);
+    if (target?.firebaseUid) addDeletedUserId(target.firebaseUid);
+
+    // 2. Remove from active React state
     let updatedList: UserAccount[] = [];
     setAllAccounts(prev => {
-      const next = prev.filter(a => a.id !== userId);
+      const next = prev.filter(a => {
+        const aId = a.id.toLowerCase();
+        const aEmail = (a.email || '').toLowerCase().trim();
+        return aId !== targetId.toLowerCase() &&
+               aId !== userId.toLowerCase() &&
+               (!targetEmail || aEmail !== targetEmail);
+      });
       updatedList = next;
       return next;
     });
-    try {
-      deleteDoc(doc(db, 'users', userId)).catch(() => {});
-    } catch {}
-    if (updatedList.length > 0) {
-      broadcastLiveSync('ACCOUNTS_UPDATED', updatedList);
+
+    // 3. Immediately persist updated accounts array to localStorage
+    safeLocalStorageSet(STORAGE_KEYS.ACCOUNTS, JSON.stringify(updatedList));
+
+    // 4. Update any classrooms where this teacher was the lead teacher
+    if (target?.role === 'teacher' || target?.assignedClassId) {
+      setClassrooms(prev => prev.map(c => {
+        if (c.leadTeacherId === targetId || c.leadTeacherName === targetName) {
+          const updatedCls = {
+            ...c,
+            leadTeacherId: '',
+            leadTeacherName: 'Unassigned',
+          };
+          try {
+            setDoc(doc(db, 'classrooms', c.id), sanitizeForFirestore(updatedCls), { merge: true }).catch(() => {});
+          } catch {}
+          return updatedCls;
+        }
+        return c;
+      }));
     }
-    addAuditLog('DELETE_USER', `Deleted account of ${target?.name || userId}`, userId);
-    showToast(`Account for ${target?.name || 'user'} has been removed.`, 'info');
+
+    // 5. Permanent deletion from Cloud Firestore database
+    try {
+      // Primary doc deletion by target ID & user ID
+      await deleteDoc(doc(db, 'users', targetId)).catch(() => {});
+      if (userId && userId !== targetId) {
+        await deleteDoc(doc(db, 'users', userId)).catch(() => {});
+      }
+      if (target?.firebaseUid) {
+        await deleteDoc(doc(db, 'users', target.firebaseUid)).catch(() => {});
+        await deleteDoc(doc(db, 'users', `fb_${target.firebaseUid}`)).catch(() => {});
+      }
+
+      // Query any duplicate/migrated docs by email and delete them
+      if (targetEmail) {
+        try {
+          const q = query(collection(db, 'users'), where('email', '==', target.email));
+          const snap = await getDocs(q);
+          for (const d of snap.docs) {
+            await deleteDoc(doc(db, 'users', d.id)).catch(() => {});
+          }
+        } catch {}
+      }
+
+      // 6. Record tombstone in deletedAccounts Firestore collection for cross-device sync
+      const tombstoneData = {
+        id: targetId,
+        email: targetEmail,
+        name: targetName,
+        deletedAt: new Date().toISOString(),
+        deletedBy: currentUser?.name || 'Administrator',
+      };
+      await setDoc(doc(db, 'deletedAccounts', targetId), tombstoneData, { merge: true }).catch(() => {});
+      if (targetEmail) {
+        const sanitizedKey = targetEmail.replace(/[^a-zA-Z0-9_-]/g, '_');
+        await setDoc(doc(db, 'deletedAccounts', sanitizedKey), tombstoneData, { merge: true }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Firestore user deletion notice:', e);
+    }
+
+    // 7. Broadcast live sync to all browser windows & tabs
+    broadcastLiveSync('ACCOUNTS_UPDATED', updatedList);
+    broadcastLiveSync('ACCOUNT_DELETED', { userId: targetId, email: targetEmail });
+
+    // 8. Log system audit
+    addAuditLog('DELETE_USER', `Permanently deleted account ${targetName} (${targetEmail || targetId}) from database`, targetId);
+    showToast(`Account for ${targetName} has been permanently deleted from the database.`, 'info');
+    return true;
   };
 
   const registerTeacher = async (teacherData: Partial<UserAccount>): Promise<UserAccount | null> => {
