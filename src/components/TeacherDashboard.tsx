@@ -64,7 +64,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [myScopeFilter, setMyScopeFilter] = useState<'all_campuses' | 'current_campus'>('all_campuses');
   const [archiveCampusFilter, setArchiveCampusFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [weekFilter, setWeekFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [page, setPage] = useState<number>(1);
+  const pageSize = 12;
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   if (!currentUser) return null;
@@ -88,6 +91,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       list = list.filter(p => isPlanFromCampus(p, archiveCampusFilter, classrooms, allAccounts));
     }
 
+    // Week filter
+    if (weekFilter !== 'all') {
+      list = list.filter(p => p.weekNumber === parseInt(weekFilter, 10));
+    }
+
     // Status filter
     if (statusFilter !== 'all') {
       list = list.filter(p => p.status === statusFilter);
@@ -105,7 +113,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     }
 
     return list;
-  }, [viewMode, myPlansSource, allTeacherLessonPlans, archiveCampusFilter, statusFilter, searchQuery, classrooms, allAccounts]);
+  }, [viewMode, myPlansSource, allTeacherLessonPlans, archiveCampusFilter, weekFilter, statusFilter, searchQuery, classrooms, allAccounts]);
+
+  const totalPages = Math.ceil(displayedPlans.length / pageSize) || 1;
+  const paginatedDisplayedPlans = displayedPlans.slice((page - 1) * pageSize, page * pageSize);
 
   const getStatusBadge = (status: LessonPlan['status']) => {
     switch (status) {
@@ -444,12 +455,32 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               />
             </div>
 
+            {/* Week Filter Selector */}
+            <div className="flex items-center gap-1">
+              <select
+                value={weekFilter}
+                onChange={(e) => {
+                  setWeekFilter(e.target.value);
+                  setPage(1);
+                }}
+                className="text-xs font-bold py-1.5 px-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-700 focus:outline-emerald-600"
+              >
+                <option value="all">All Weeks (1-16)</option>
+                {Array.from({ length: 16 }, (_, i) => i + 1).map(w => (
+                  <option key={w} value={w.toString()}>Week {w} {w === 12 ? '★ Active' : ''}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Status Filter Buttons */}
             <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
               {['all', 'approved', 'submitted', 'revision_requested', 'draft'].map((tab) => (
                 <button
                   key={tab}
-                  onClick={() => setStatusFilter(tab)}
+                  onClick={() => {
+                    setStatusFilter(tab);
+                    setPage(1);
+                  }}
                   className={`px-2.5 py-1.5 rounded-xl text-xs font-bold capitalize transition-all whitespace-nowrap ${
                     statusFilter === tab
                       ? 'bg-[#007A43] text-white shadow-2xs'
@@ -473,7 +504,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             <p className="text-xs text-slate-500 max-w-sm mx-auto">
               {viewMode === 'my_plans'
                 ? 'Create a new early childhood lesson plan for your classroom or switch to All Campuses.'
-                : 'Try adjusting your search terms or campus filter to view plans.'}
+                : 'Try adjusting your search terms, week, or campus filter to view plans.'}
             </p>
             {viewMode === 'my_plans' ? (
               <button
@@ -486,18 +517,20 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               <button
                 onClick={() => {
                   setArchiveCampusFilter('all');
+                  setWeekFilter('all');
                   setStatusFilter('all');
                   setSearchQuery('');
+                  setPage(1);
                 }}
                 className="mt-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition-colors"
               >
-                Reset Filters (Show All 10 Plans)
+                Reset Filters & Show All {allTeacherLessonPlans.length} Plans
               </button>
             )}
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {displayedPlans.map((plan) => {
+            {paginatedDisplayedPlans.map((plan) => {
               const isOwner = plan.teacherId === currentUser.id || 
                               (plan.teacherEmail && plan.teacherEmail.toLowerCase() === (currentUser.email || '').toLowerCase());
               const planCampus = CAMPUS_LIST.find(c => c.id === plan.campusId);
@@ -609,6 +642,48 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Pagination Bar */}
+        {displayedPlans.length > pageSize && (
+          <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <p className="text-slate-500 font-medium">
+              Showing <span className="font-bold text-slate-800">{(page - 1) * pageSize + 1}</span> to <span className="font-bold text-slate-800">{Math.min(page * pageSize, displayedPlans.length)}</span> of <span className="font-bold text-[#007A43]">{displayedPlans.length}</span> lesson plans
+            </p>
+            <div className="flex items-center gap-1">
+              <button
+                disabled={page === 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100"
+              >
+                Previous
+              </button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(pNum => pNum === 1 || pNum === totalPages || Math.abs(pNum - page) <= 1)
+                .map((pNum, idx, arr) => (
+                  <React.Fragment key={pNum}>
+                    {idx > 0 && arr[idx - 1] !== pNum - 1 && <span className="px-1 text-slate-400">...</span>}
+                    <button
+                      onClick={() => setPage(pNum)}
+                      className={`w-8 h-8 rounded-lg font-bold transition-all ${
+                        page === pNum
+                          ? 'bg-[#007A43] text-white shadow-xs'
+                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {pNum}
+                    </button>
+                  </React.Fragment>
+                ))}
+              <button
+                disabled={page === totalPages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { LessonPlan, UserAccount, UserRole, Classroom, SchoolLevel, CAMPUS_LIST, isCentralHQUser } from '../types';
+import { LessonPlan, UserAccount, UserRole, Classroom, SchoolLevel, CAMPUS_LIST, isCentralHQUser, isAdminOrSuperAdmin } from '../types';
 import { StaffManagementModal } from './StaffManagementModal';
 import { ClassroomModal } from './ClassroomModal';
 import { ClassroomsAndLevelsTab } from './ClassroomsAndLevelsTab';
@@ -75,8 +75,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>('all');
   const [selectedAgeGroup, setSelectedAgeGroup] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [selectedSubmissionWeek, setSelectedSubmissionWeek] = useState<string>('all');
   const [selectedWeek, setSelectedWeek] = useState<number>(12);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(15);
   
   // Batch selection
   const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
@@ -93,12 +96,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const isCentralStaff = isCentralHQUser(currentUser);
 
-  const teachers = allAccounts.filter(a => {
-    if (a.role !== 'teacher') return false;
-    if (selectedCampusId && selectedCampusId !== 'ALL') return a.campusId === selectedCampusId;
-    if (selectedCampusFilter !== 'all') return a.campusId === selectedCampusFilter;
-    return true;
-  });
+  // All registered teachers across all campuses
+  const teachers = allAccounts.filter(a => a.role === 'teacher');
 
   const campusClassrooms = classrooms.filter(c => {
     if (!selectedCampusId || selectedCampusId === 'ALL') return true;
@@ -107,13 +106,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   const weeklyCompliance = getWeeklyCompliance(selectedWeek);
 
-  // Filtered master submissions list
+  // Filtered master submissions list - Defaults to showing all submissions
   const filteredPlans = lessonPlans.filter((plan) => {
-    if (selectedCampusId && selectedCampusId !== 'ALL') {
-      if (!isPlanFromCampus(plan, selectedCampusId, classrooms, allAccounts)) return false;
-    } else if (selectedCampusFilter !== 'all') {
+    if (selectedCampusFilter !== 'all') {
       if (!isPlanFromCampus(plan, selectedCampusFilter, classrooms, allAccounts)) return false;
     }
+    if (selectedSubmissionWeek !== 'all' && plan.weekNumber !== parseInt(selectedSubmissionWeek, 10)) return false;
     if (selectedTeacherId !== 'all' && plan.teacherId !== selectedTeacherId) return false;
     if (selectedAgeGroup !== 'all' && plan.ageGroup !== selectedAgeGroup) return false;
     if (selectedStatus !== 'all' && plan.status !== selectedStatus) return false;
@@ -126,6 +124,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
     return true;
   });
+
+  const totalPages = Math.ceil(filteredPlans.length / pageSize) || 1;
+  const paginatedPlans = filteredPlans.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   // Cross-campus metrics breakdown for Central HQ monitoring
   const campusNetworkMetrics = React.useMemo(() => {
@@ -391,7 +392,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           <span>Weekly Compliance Matrix (Week {selectedWeek})</span>
         </button>
 
-        {currentUser?.role === 'admin' && (
+        {(currentUser?.role === 'admin' || currentUser?.role === 'academic_officer' || isAdminOrSuperAdmin(currentUser)) && (
           <button
             onClick={() => setActiveAdminSubTab('staff')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap ${
@@ -405,7 +406,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </button>
         )}
 
-        {currentUser?.role === 'admin' && (
+        {(currentUser?.role === 'admin' || currentUser?.role === 'academic_officer' || isAdminOrSuperAdmin(currentUser)) && (
           <button
             onClick={() => setActiveAdminSubTab('classrooms_levels')}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-extrabold transition-all whitespace-nowrap ${
@@ -509,6 +510,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                               <p className="text-[11px] text-slate-500 font-['Battambang']">{user.khmerName}</p>
                             )}
                             <p className="text-[10px] text-slate-400">{user.email}</p>
+                            <span className="text-[10px] font-bold text-slate-600 flex items-center gap-1 mt-0.5">
+                              <Building2 className="w-3 h-3 text-emerald-600" />
+                              {user.campusName || user.campusId || 'Central HQ'}
+                            </span>
                           </div>
                         </div>
                       </td>
@@ -975,25 +980,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
             {/* Filter Dropdowns Row */}
-            <div className={`grid grid-cols-1 ${selectedCampusId === 'ALL' ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-3 pt-2`}>
-              {selectedCampusId === 'ALL' && (
-                <div>
-                  <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1 flex items-center gap-1">
-                    <Building2 className="w-3 h-3 text-emerald-600" />
-                    Filter by Campus
-                  </label>
-                  <select
-                    value={selectedCampusFilter}
-                    onChange={(e) => setSelectedCampusFilter(e.target.value)}
-                    className="w-full px-3 py-1.5 bg-purple-50/60 border border-purple-200 rounded-xl text-xs font-bold text-purple-950 focus:outline-purple-600"
-                  >
-                    <option value="all">🏢 All 7 Campuses</option>
-                    {CAMPUS_LIST.filter(c => c.id !== 'ALL').map(c => (
-                      <option key={c.id} value={c.id}>{c.shortName} ({c.brand})</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-2">
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1 flex items-center gap-1">
+                  <Building2 className="w-3 h-3 text-emerald-600" />
+                  Filter by Campus
+                </label>
+                <select
+                  value={selectedCampusFilter}
+                  onChange={(e) => {
+                    setSelectedCampusFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-3 py-1.5 bg-purple-50/60 border border-purple-200 rounded-xl text-xs font-bold text-purple-950 focus:outline-purple-600"
+                >
+                  <option value="all">🏢 All 7 Campuses ({lessonPlans.length} Plans)</option>
+                  {CAMPUS_LIST.filter(c => c.id !== 'ALL').map(c => (
+                    <option key={c.id} value={c.id}>{c.shortName} ({c.brand})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
+                  Curriculum Week
+                </label>
+                <select
+                  value={selectedSubmissionWeek}
+                  onChange={(e) => {
+                    setSelectedSubmissionWeek(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800"
+                >
+                  <option value="all">All Weeks (1-16)</option>
+                  {Array.from({ length: 16 }, (_, i) => i + 1).map(w => (
+                    <option key={w} value={w.toString()}>Week {w} {w === 12 ? '★ Active' : ''}</option>
+                  ))}
+                </select>
+              </div>
 
               <div>
                 <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
@@ -1001,7 +1026,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 </label>
                 <select
                   value={selectedTeacherId}
-                  onChange={(e) => setSelectedTeacherId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedTeacherId(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800"
                 >
                   <option value="all">All Educators ({teachers.length})</option>
@@ -1013,15 +1041,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div>
                 <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
-                  Filter by Classroom Level
+                  Classroom Level
                 </label>
                 <select
                   value={selectedAgeGroup}
-                  onChange={(e) => setSelectedAgeGroup(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedAgeGroup(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800"
                 >
                   <option value="all">All Levels</option>
-                  <option value="Toddlers">{formatAgeGroup('Toddlers')}</option>
+                  <option value="Pre-Nursery">Pre-Nursery / Toddlers</option>
                   <option value="Nursery">Nursery</option>
                   <option value="Pre-School">Pre-School</option>
                   <option value="Kindergarten">Kindergarten</option>
@@ -1030,11 +1061,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               <div>
                 <label className="text-[11px] font-bold text-slate-500 uppercase block mb-1">
-                  Filter by Review Status
+                  Review Status
                 </label>
                 <select
                   value={selectedStatus}
-                  onChange={(e) => setSelectedStatus(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedStatus(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800"
                 >
                   <option value="all">All Statuses</option>
@@ -1052,24 +1086,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div className="p-12 text-center space-y-3">
               <BookOpen className="w-12 h-12 text-slate-300 mx-auto" />
               <p className="text-sm font-bold text-slate-700">No submissions matching criteria.</p>
-              <p className="text-xs text-slate-400">Try changing campus, teacher, or status filters.</p>
+              <p className="text-xs text-slate-400">Try changing campus, week, teacher, or status filters.</p>
               <button
                 onClick={() => {
                   setSelectedCampusFilter('all');
                   setSelectedCampusId('ALL');
+                  setSelectedSubmissionWeek('all');
                   setSelectedTeacherId('all');
                   setSelectedAgeGroup('all');
                   setSelectedStatus('all');
                   setSearchQuery('');
+                  setCurrentPage(1);
                 }}
                 className="px-4 py-2 bg-[#007A43] hover:bg-[#006338] text-white text-xs font-bold rounded-xl transition-all shadow-xs"
               >
-                Reset Filters & Show All 10 Plans
+                Reset Filters & Show All {lessonPlans.length} Plans
               </button>
             </div>
           ) : (
             <div className="divide-y divide-slate-100">
-              {filteredPlans.map((plan) => {
+              {paginatedPlans.map((plan) => {
                 const isSelected = selectedPlanIds.includes(plan.id);
                 const planCampus = CAMPUS_LIST.find(c => c.id === plan.campusId) || 
                   CAMPUS_LIST.find(c => c.id === classrooms.find(cls => cls.id === plan.classId)?.campusId);
@@ -1174,6 +1210,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {filteredPlans.length > pageSize && (
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+              <p className="text-slate-500 font-medium">
+                Showing <span className="font-bold text-slate-800">{(currentPage - 1) * pageSize + 1}</span> to <span className="font-bold text-slate-800">{Math.min(currentPage * pageSize, filteredPlans.length)}</span> of <span className="font-bold text-[#007A43]">{filteredPlans.length}</span> lesson plans
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100"
+                >
+                  Previous
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => page === 1 || page === totalPages || Math.abs(page - currentPage) <= 1)
+                  .map((page, idx, arr) => (
+                    <React.Fragment key={page}>
+                      {idx > 0 && arr[idx - 1] !== page - 1 && <span className="px-1 text-slate-400">...</span>}
+                      <button
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded-lg font-bold transition-all ${
+                          currentPage === page
+                            ? 'bg-[#007A43] text-white shadow-xs'
+                            : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    </React.Fragment>
+                  ))}
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-bold text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-100"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
         </div>

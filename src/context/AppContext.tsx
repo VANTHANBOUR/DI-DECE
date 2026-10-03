@@ -39,6 +39,7 @@ import {
 export type NavigationTab = 
   | 'dashboard' 
   | 'lesson_plans' 
+  | 'teachers'
   | 'create_plan' 
   | 'compliance_matrix' 
   | 'classrooms' 

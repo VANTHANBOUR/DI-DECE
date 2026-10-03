@@ -62,13 +62,16 @@ export const Header: React.FC<HeaderProps> = ({
     isOfflineMode,
   } = useApp();
 
+  const teachersCount = React.useMemo(() => {
+    return allAccounts.filter(a => a.role === 'teacher').length;
+  }, [allAccounts]);
+
   const displayedPlansCount = React.useMemo(() => {
     if (isAdminOrSuperAdmin(currentUser)) {
-      if (!selectedCampusId || selectedCampusId === 'ALL') return lessonPlans.length;
-      return lessonPlans.filter(p => isPlanFromCampus(p, selectedCampusId, classrooms, allAccounts)).length;
+      return lessonPlans.length;
     }
     return userLessonPlans.length;
-  }, [currentUser, lessonPlans, userLessonPlans, selectedCampusId, classrooms, allAccounts]);
+  }, [currentUser, lessonPlans, userLessonPlans]);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isUserProfileEditorOpen, setIsUserProfileEditorOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -139,6 +142,18 @@ export const Header: React.FC<HeaderProps> = ({
               {isAdminOrSuperAdmin(currentUser)
                 ? `All Lesson Plans (${displayedPlansCount})`
                 : `My Lesson Plans (${displayedPlansCount})`}
+            </button>
+
+            <button
+              onClick={() => setActiveTab('teachers')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                activeTab === 'teachers'
+                  ? 'bg-white text-[#007A43] shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Teachers & Faculty ({teachersCount})</span>
             </button>
 
             <button
@@ -491,6 +506,17 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               📚 {isAdminOrSuperAdmin(currentUser) ? `All Plans (${displayedPlansCount})` : `My Plans (${displayedPlansCount})`}
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab('teachers');
+                setIsMobileMenuOpen(false);
+              }}
+              className={`p-3 rounded-xl text-left border transition-all ${
+                activeTab === 'teachers' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-slate-50 border-slate-200 text-slate-700'
+              }`}
+            >
+              👥 Teachers & Faculty ({teachersCount})
             </button>
             <button
               onClick={() => {

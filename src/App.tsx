@@ -12,6 +12,7 @@ import { NewTeacherModal } from './components/NewTeacherModal';
 import { AuthModal } from './components/AuthModal';
 import { AuthGate } from './components/AuthGate';
 import { SchoolProfileModal } from './components/SchoolProfileModal';
+import { TeachersDirectory } from './components/TeachersDirectory';
 import { LessonPlan, isAdminOrSuperAdmin } from './types';
 import { 
   LayoutDashboard, 
@@ -118,6 +119,11 @@ const MainContent: React.FC = () => {
         {/* Render Active View - Unrestricted tab access across all roles */}
         {activeTab === 'admin_console' ? (
           <AdminConsole
+            onSelectPlan={handleSelectPlan}
+            onOpenNewTeacher={() => setIsNewTeacherOpen(true)}
+          />
+        ) : activeTab === 'teachers' ? (
+          <TeachersDirectory
             onSelectPlan={handleSelectPlan}
             onOpenNewTeacher={() => setIsNewTeacherOpen(true)}
           />
