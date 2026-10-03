@@ -362,7 +362,7 @@ const processImageFileToDataUrl = (file: File): Promise<string> => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Accounts - Always merge all INITIAL_ACCOUNTS so all teachers & Central HQ officers are present (excluding any removed accounts)
+  // Accounts - Initialized from persistent storage if present, or INITIAL_ACCOUNTS on fresh install
   const [allAccounts, setAllAccounts] = useState<UserAccount[]>(() => {
     try {
       const deletedIds = getDeletedUserIds();
@@ -370,25 +370,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const map = new Map<string, UserAccount>();
-          INITIAL_ACCOUNTS.forEach(a => {
-            const idKey = a.id.toLowerCase();
-            const emailKey = (a.email || '').toLowerCase().trim();
-            if (!deletedIds.has(idKey) && !deletedIds.has(emailKey) && !a.name.includes('Sopheak')) {
-              map.set(a.id, a);
-            }
-          });
-          parsed.forEach((a: UserAccount) => {
-            const idKey = a.id.toLowerCase();
-            const emailKey = (a.email || '').toLowerCase().trim();
-            if (deletedIds.has(idKey) || deletedIds.has(emailKey) || (a.name && a.name.includes('Sopheak'))) {
-              return;
-            }
-            const existing = map.get(a.id);
-            map.set(a.id, { ...existing, ...a });
-          });
-          return Array.from(map.values()).filter(a => {
-            const idKey = a.id.toLowerCase();
+          // Use user's active accounts and filter any permanently deleted accounts
+          return parsed.filter((a: UserAccount) => {
+            const idKey = (a.id || '').toLowerCase();
             const emailKey = (a.email || '').toLowerCase().trim();
             return !deletedIds.has(idKey) && !deletedIds.has(emailKey) && !a.name?.includes('Sopheak');
           });
@@ -945,10 +929,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
           setAllAccounts(prev => {
             const map = new Map<string, UserAccount>();
-            prev.filter(u => !deletedIds.has(u.id.toLowerCase()) && !deletedIds.has((u.email || '').toLowerCase().trim()) && !u.name?.includes('Sopheak')).forEach(u => map.set(u.id, u));
+            // Remote database users collection is the authoritative source
             remoteUsers.forEach(u => {
               if (deletedIds.has(u.id.toLowerCase()) || deletedIds.has((u.email || '').toLowerCase().trim())) return;
-              const existing = map.get(u.id);
+              const existing = prev.find(p => p.id === u.id || (p.email && u.email && p.email.toLowerCase() === u.email.toLowerCase()));
               const originalPassword = u.password || existing?.password || (INITIAL_ACCOUNTS.find(a => a.id === u.id || a.email.toLowerCase() === u.email.toLowerCase())?.password);
               map.set(u.id, {
                 ...existing,
@@ -1015,7 +999,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         window.removeEventListener('storage', handleStorageEvent);
       }
     };
-  }, [isAuthenticated, currentUser?.id, isQuotaExceeded]);
+  }, [isAuthenticated, currentUser?.id]);
 
   // Sync to local storage
   useEffect(() => {
