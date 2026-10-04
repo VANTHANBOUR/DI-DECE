@@ -103,6 +103,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   
   // Deletion confirmations
   const [planToDelete, setPlanToDelete] = useState<LessonPlan | null>(null);
+  const [isDeletingPlan, setIsDeletingPlan] = useState<boolean>(false);
   const [userToDelete, setUserToDelete] = useState<UserAccount | null>(null);
   const [isDeletingUser, setIsDeletingUser] = useState<boolean>(false);
 
@@ -195,19 +196,30 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
     });
   };
 
-  const handleBatchDelete = () => {
+  const handleBatchDelete = async () => {
     if (selectedPlanIds.length === 0) return;
-    if (window.confirm(`Are you sure you want to permanently delete ${selectedPlanIds.length} lesson plan(s)?`)) {
-      selectedPlanIds.forEach(id => deleteLessonPlan(id));
-      setSelectedPlanIds([]);
-      showToast(`Purged ${selectedPlanIds.length} lesson plans from database.`, 'info');
+    if (window.confirm(`Are you sure you want to permanently delete ${selectedPlanIds.length} lesson plan(s) from the database?`)) {
+      setIsDeletingPlan(true);
+      try {
+        for (const id of selectedPlanIds) {
+          await deleteLessonPlan(id);
+        }
+        setSelectedPlanIds([]);
+      } finally {
+        setIsDeletingPlan(false);
+      }
     }
   };
 
-  const confirmDeletePlan = () => {
+  const confirmDeletePlan = async () => {
     if (planToDelete) {
-      deleteLessonPlan(planToDelete.id);
-      setPlanToDelete(null);
+      setIsDeletingPlan(true);
+      try {
+        await deleteLessonPlan(planToDelete.id);
+      } finally {
+        setIsDeletingPlan(false);
+        setPlanToDelete(null);
+      }
     }
   };
 
@@ -1186,23 +1198,35 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Are you sure you want to permanently delete the lesson plan <strong className="text-slate-900">"{planToDelete.themeTitle}"</strong> submitted by <strong className="text-slate-900">{planToDelete.teacherName}</strong>? This action cannot be undone.
+              Are you sure you want to permanently delete the lesson plan <strong className="text-slate-900">"{planToDelete.themeTitle}"</strong> submitted by <strong className="text-slate-900">{planToDelete.teacherName}</strong>? This lesson plan and all attached records will be permanently removed from the database.
             </p>
 
             <div className="flex items-center justify-end gap-2 pt-2">
               <button
                 type="button"
+                disabled={isDeletingPlan}
                 onClick={() => setPlanToDelete(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="button"
+                disabled={isDeletingPlan}
                 onClick={confirmDeletePlan}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors"
               >
-                Delete Plan
+                {isDeletingPlan ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Deleting from database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Plan From Database</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

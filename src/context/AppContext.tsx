@@ -97,7 +97,7 @@ interface AppContextType {
   // Actions
   createLessonPlan: (planData: Omit<LessonPlan, 'id' | 'createdAt' | 'updatedAt' | 'feedbackHistory'>) => LessonPlan;
   updateLessonPlan: (id: string, updates: Partial<LessonPlan>) => void;
-  deleteLessonPlan: (id: string) => void;
+  deleteLessonPlan: (id: string) => Promise<boolean>;
   submitLessonPlan: (id: string) => void;
   
   // Admin & Academic Officer Actions
@@ -164,6 +164,7 @@ const STORAGE_KEYS = {
   ACCOUNTS: 'dch_accounts_v6',
   DELETED_ACCOUNTS: 'dch_deleted_accounts_v6',
   LESSON_PLANS: 'dch_lesson_plans_v6',
+  DELETED_PLANS: 'dch_deleted_plans_v6',
   CLASSROOMS: 'dch_classrooms_v6',
   AUDIT_LOGS: 'dch_audit_logs_v6',
   SCHOOL_PROFILE: 'dch_school_profile_v6',
@@ -274,6 +275,29 @@ const addDeletedUserId = (idOrEmail: string): void => {
     const set = getDeletedUserIds();
     set.add(idOrEmail.toLowerCase().trim());
     safeLocalStorageSet(STORAGE_KEYS.DELETED_ACCOUNTS, JSON.stringify(Array.from(set)));
+  } catch {}
+};
+
+// Permanent deleted lesson plans register to guarantee deleted plans never resurrect from seeds or cache
+const getDeletedPlanIds = (): Set<string> => {
+  try {
+    const saved = safeLocalStorageGet(STORAGE_KEYS.DELETED_PLANS);
+    if (saved) {
+      const arr = JSON.parse(saved);
+      if (Array.isArray(arr)) {
+        return new Set<string>(arr.map((item: string) => String(item).trim()));
+      }
+    }
+  } catch {}
+  return new Set<string>();
+};
+
+const addDeletedPlanId = (id: string): void => {
+  if (!id) return;
+  try {
+    const set = getDeletedPlanIds();
+    set.add(id.trim());
+    safeLocalStorageSet(STORAGE_KEYS.DELETED_PLANS, JSON.stringify(Array.from(set)));
   } catch {}
 };
 
@@ -457,28 +481,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  // Lesson Plans - Guaranteed all 10 teacher submissions are merged and visible
+  // Lesson Plans - Initialized from persistent storage or initial submissions, excluding deleted plans
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>(() => {
     try {
+      const deletedPlanIds = getDeletedPlanIds();
       const saved = safeLocalStorageGet(STORAGE_KEYS.LESSON_PLANS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const map = new Map<string, LessonPlan>();
-          // 1. Seed all 10 initial submissions
-          INITIAL_LESSON_PLANS.forEach(p => map.set(p.id, p));
-          // 2. Overlay any saved plan updates while preserving all 10 entries
-          parsed.forEach((p: LessonPlan) => {
-            if (map.has(p.id)) {
-              map.set(p.id, { ...map.get(p.id)!, ...p });
-            } else {
-              map.set(p.id, p);
-            }
-          });
-          return Array.from(map.values());
+          // Use user's active saved plans and filter out any permanently deleted plans
+          return parsed.filter((p: LessonPlan) => !deletedPlanIds.has(p.id));
         }
       }
-      return INITIAL_LESSON_PLANS;
+      return INITIAL_LESSON_PLANS.filter(p => !deletedPlanIds.has(p.id));
     } catch {
       return INITIAL_LESSON_PLANS;
     }
@@ -719,6 +734,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (email) addDeletedUserId(email);
               setAllAccounts(prev => prev.filter(a => a.id !== userId && a.email?.toLowerCase() !== email?.toLowerCase()));
             }
+          } else if (type === 'PLAN_DELETED') {
+            const planId = typeof data === 'string' ? data : (data as any)?.id;
+            if (planId) {
+              addDeletedPlanId(planId);
+              setLessonPlans(prev => prev.filter(p => p.id !== planId));
+              if (selectedPlan?.id === planId) {
+                setSelectedPlan(null);
+              }
+            }
           } else if (type === 'FORCE_SYNC_TRIGGERED') {
             if (data?.timestamp) {
               setLastSyncedAt(data.timestamp);
@@ -748,6 +772,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else if (e.key === STORAGE_KEYS.DELETED_ACCOUNTS) {
           const deletedIds = getDeletedUserIds();
           setAllAccounts(prev => prev.filter(a => !deletedIds.has(a.id.toLowerCase()) && !deletedIds.has(a.email?.toLowerCase())));
+        } else if (e.key === STORAGE_KEYS.DELETED_PLANS) {
+          const deletedPlans = getDeletedPlanIds();
+          setLessonPlans(prev => prev.filter(p => !deletedPlans.has(p.id)));
         }
       } catch {}
     };
@@ -808,10 +835,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               });
             }
 
+            const deletedPlanIds = getDeletedPlanIds();
             const planMap = new Map<string, LessonPlan>();
-            prev.forEach(p => planMap.set(p.id, p));
+
+            // Remote database plans are the authoritative source
             remotePlans.forEach(p => {
-              const local = planMap.get(p.id);
+              if (deletedPlanIds.has(p.id)) {
+                try {
+                  deleteDoc(doc(db, 'lessonPlans', p.id)).catch(() => {});
+                } catch {}
+                return;
+              }
+              const local = prev.find(item => item.id === p.id);
               if (!local) {
                 planMap.set(p.id, p);
               } else {
@@ -819,10 +854,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 const remoteUpdated = p.updatedAt || p.createdAt || '';
                 if (remoteUpdated >= localUpdated) {
                   planMap.set(p.id, p);
+                } else {
+                  planMap.set(p.id, local);
                 }
               }
             });
-            const updatedPlans = Array.from(planMap.values());
+
+            // Keep locally-created drafts not yet uploaded, provided they aren't deleted
+            prev.forEach(localPlan => {
+              if (localPlan.id.startsWith('local_') && !deletedPlanIds.has(localPlan.id) && !planMap.has(localPlan.id)) {
+                planMap.set(localPlan.id, localPlan);
+              }
+            });
+
+            const updatedPlans = Array.from(planMap.values()).filter(p => !deletedPlanIds.has(p.id));
 
             if (selectedPlan) {
               const fresh = updatedPlans.find(p => p.id === selectedPlan.id);
@@ -986,6 +1031,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }, () => {});
     } catch {}
 
+    // 10. Listen for real-time Deleted Lesson Plans tombstones from Firestore
+    let unsubDeletedPlans: (() => void) | null = null;
+    try {
+      unsubDeletedPlans = onSnapshot(collection(db, 'deletedPlans'), (snapshot) => {
+        if (!snapshot.empty) {
+          const currentDeleted = getDeletedPlanIds();
+          let hasNew = false;
+          snapshot.forEach(docSnap => {
+            const planId = docSnap.id.trim();
+            if (!currentDeleted.has(planId)) {
+              currentDeleted.add(planId);
+              hasNew = true;
+            }
+          });
+          if (hasNew) {
+            safeLocalStorageSet(STORAGE_KEYS.DELETED_PLANS, JSON.stringify(Array.from(currentDeleted)));
+            setLessonPlans(prev => prev.filter(p => !currentDeleted.has(p.id)));
+          }
+        }
+      }, () => {});
+    } catch {}
+
     return () => {
       if (unsubPlans) unsubPlans();
       if (unsubClassrooms) unsubClassrooms();
@@ -994,6 +1061,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (unsubProfile) unsubProfile();
       if (unsubUsers) unsubUsers();
       if (unsubDeletedAccounts) unsubDeletedAccounts();
+      if (unsubDeletedPlans) unsubDeletedPlans();
       if (bc) bc.close();
       if (typeof window !== 'undefined') {
         window.removeEventListener('storage', handleStorageEvent);
@@ -1643,18 +1711,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Lesson plan updated and synced', 'success');
   };
 
-  const deleteLessonPlan = (id: string) => {
+  const deleteLessonPlan = async (id: string): Promise<boolean> => {
     const target = lessonPlans.find(p => p.id === id);
-    setLessonPlans(prev => prev.filter(p => p.id !== id));
+    const planTitle = target?.themeTitle || id;
+
+    // 1. Immediately register in permanent deletion registry
+    addDeletedPlanId(id);
+
+    // 2. Remove from active React state
+    let updatedList: LessonPlan[] = [];
+    setLessonPlans(prev => {
+      const next = prev.filter(p => p.id !== id);
+      updatedList = next;
+      return next;
+    });
+
     if (selectedPlan?.id === id) {
       setSelectedPlan(null);
     }
+
+    // 3. Immediately persist updated plans array to localStorage
+    safeLocalStorageSet(STORAGE_KEYS.LESSON_PLANS, JSON.stringify(updatedList));
+
+    // 4. Delete document from Cloud Firestore database
     try {
-      deleteDoc(doc(db, 'lessonPlans', id)).catch(() => {});
-    } catch {}
+      await deleteDoc(doc(db, 'lessonPlans', id));
+
+      // 5. Record tombstone in deletedPlans collection for cross-device sync
+      const tombstoneData = {
+        id,
+        themeTitle: planTitle,
+        deletedAt: new Date().toISOString(),
+        deletedBy: currentUser?.name || 'Staff Member',
+      };
+      await setDoc(doc(db, 'deletedPlans', id), tombstoneData, { merge: true }).catch(() => {});
+    } catch (e: any) {
+      console.warn('Firestore lesson plan deletion notice:', e);
+    }
+
+    // 6. Broadcast live sync to all browser windows & tabs
     broadcastLiveSync('PLAN_DELETED', id);
-    addAuditLog('DELETE_PLAN', `Deleted lesson plan "${target?.themeTitle || id}" by ${currentUser?.name || 'Staff'}`, id);
-    showToast(`Lesson plan "${target?.themeTitle || 'item'}" removed.`, 'info');
+
+    // 7. Audit log & user toast
+    addAuditLog('DELETE_PLAN', `Permanently deleted lesson plan "${planTitle}" from database by ${currentUser?.name || 'Staff'}`, id);
+    showToast(`Lesson plan "${planTitle}" has been permanently deleted from the database.`, 'info');
+    return true;
   };
 
   const submitLessonPlan = (id: string) => {
