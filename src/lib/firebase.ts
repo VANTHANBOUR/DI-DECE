@@ -24,7 +24,8 @@ import {
   onSnapshot, 
   getDocFromServer,
   serverTimestamp,
-  Firestore
+  Firestore,
+  setLogLevel
 } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseAppletConfig from '../../firebase-applet-config.json';
@@ -42,13 +43,18 @@ googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
+// Set Firestore log level to error to suppress transient connection attempt logs
+try {
+  setLogLevel('error');
+} catch {}
+
 // Initialize Firestore safely with database ID and resilient iframe-compatible transport
 const firestoreDbId = (firebaseConfig as any).firestoreDatabaseId;
 
 let firestoreInstance: Firestore;
 try {
   firestoreInstance = initializeFirestore(app, {
-    experimentalForceLongPolling: true,
+    experimentalAutoDetectLongPolling: true,
     ignoreUndefinedProperties: true,
   }, firestoreDbId || undefined);
 } catch {
@@ -170,7 +176,11 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 export async function testFirestoreConnection(): Promise<FirestoreStatus> {
   try {
     const docRef = doc(db, 'settings', 'schoolProfile');
-    await getDocFromServer(docRef);
+    const fetchPromise = getDocFromServer(docRef);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Connection check timeout')), 3000)
+    );
+    await Promise.race([fetchPromise, timeoutPromise]);
     return {
       isConnected: true,
       isQuotaExceeded: false,
@@ -179,15 +189,14 @@ export async function testFirestoreConnection(): Promise<FirestoreStatus> {
   } catch (error: any) {
     const code = error?.code || '';
     const msg = error?.message || String(error);
-    const isOffline = code === 'unavailable' || msg.includes('offline') || msg.includes('Could not reach Cloud Firestore') || msg.includes('the client is offline');
+    const isOffline = code === 'unavailable' || msg.includes('offline') || msg.includes('Could not reach Cloud Firestore') || msg.includes('the client is offline') || msg.includes('timeout');
 
     if (isOffline) {
-      console.info('Firestore is operating in offline mode (local cache active).');
       return {
         isConnected: false,
         isQuotaExceeded: false,
         isOffline: true,
-        errorMessage: 'Client operating in offline mode.'
+        errorMessage: 'Client operating in offline cache mode.'
       };
     }
 

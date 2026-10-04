@@ -386,29 +386,38 @@ const processImageFileToDataUrl = (file: File): Promise<string> => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Accounts - Initialized from persistent storage if present, or INITIAL_ACCOUNTS on fresh install
+  // Accounts - Initialized with all 34 registered institutional accounts, preserving modifications
   const [allAccounts, setAllAccounts] = useState<UserAccount[]>(() => {
     try {
       const deletedIds = getDeletedUserIds();
+      const map = new Map<string, UserAccount>();
+      INITIAL_ACCOUNTS.forEach(a => {
+        const idKey = a.id.toLowerCase();
+        const emailKey = (a.email || '').toLowerCase().trim();
+        if (!deletedIds.has(idKey) && !deletedIds.has(emailKey)) {
+          map.set(a.id, a);
+        }
+      });
       const saved = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Use user's active accounts and filter any permanently deleted accounts
-          return parsed.filter((a: UserAccount) => {
+          parsed.forEach((a: UserAccount) => {
             const idKey = (a.id || '').toLowerCase();
             const emailKey = (a.email || '').toLowerCase().trim();
-            return !deletedIds.has(idKey) && !deletedIds.has(emailKey) && !a.name?.includes('Sopheak');
+            if (!deletedIds.has(idKey) && !deletedIds.has(emailKey)) {
+              if (map.has(a.id)) {
+                map.set(a.id, { ...map.get(a.id)!, ...a });
+              } else {
+                map.set(a.id, a);
+              }
+            }
           });
         }
       }
-      return INITIAL_ACCOUNTS.filter(a => {
-        const idKey = a.id.toLowerCase();
-        const emailKey = (a.email || '').toLowerCase().trim();
-        return !deletedIds.has(idKey) && !deletedIds.has(emailKey) && !a.name?.includes('Sopheak');
-      });
+      return Array.from(map.values()).filter(a => !deletedIds.has(a.id.toLowerCase()) && !deletedIds.has((a.email || '').toLowerCase().trim()) && !a.name?.includes('Sopheak'));
     } catch {
-      return INITIAL_ACCOUNTS.filter(a => a.id !== 'admin_principal');
+      return INITIAL_ACCOUNTS;
     }
   });
 
@@ -481,19 +490,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  // Lesson Plans - Initialized from persistent storage or initial submissions, excluding deleted plans
+  // Lesson Plans - Initialized from all registered accounts and saved storage, excluding deleted plans
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>(() => {
     try {
       const deletedPlanIds = getDeletedPlanIds();
+      const map = new Map<string, LessonPlan>();
+      INITIAL_LESSON_PLANS.forEach(p => {
+        if (!deletedPlanIds.has(p.id)) {
+          map.set(p.id, p);
+        }
+      });
       const saved = safeLocalStorageGet(STORAGE_KEYS.LESSON_PLANS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          // Use user's active saved plans and filter out any permanently deleted plans
-          return parsed.filter((p: LessonPlan) => !deletedPlanIds.has(p.id));
+          parsed.forEach((p: LessonPlan) => {
+            if (!deletedPlanIds.has(p.id)) {
+              if (map.has(p.id)) {
+                map.set(p.id, { ...map.get(p.id)!, ...p });
+              } else {
+                map.set(p.id, p);
+              }
+            }
+          });
         }
       }
-      return INITIAL_LESSON_PLANS.filter(p => !deletedPlanIds.has(p.id));
+      return Array.from(map.values()).filter(p => !deletedPlanIds.has(p.id));
     } catch {
       return INITIAL_LESSON_PLANS;
     }
@@ -974,10 +996,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           });
           setAllAccounts(prev => {
             const map = new Map<string, UserAccount>();
+            INITIAL_ACCOUNTS.forEach(a => {
+              const idKey = a.id.toLowerCase();
+              const emailKey = (a.email || '').toLowerCase().trim();
+              if (!deletedIds.has(idKey) && !deletedIds.has(emailKey)) {
+                map.set(a.id, a);
+              }
+            });
+            prev.forEach(a => {
+              const idKey = a.id.toLowerCase();
+              const emailKey = (a.email || '').toLowerCase().trim();
+              if (!deletedIds.has(idKey) && !deletedIds.has(emailKey)) {
+                map.set(a.id, a);
+              }
+            });
             // Remote database users collection is the authoritative source
             remoteUsers.forEach(u => {
               if (deletedIds.has(u.id.toLowerCase()) || deletedIds.has((u.email || '').toLowerCase().trim())) return;
-              const existing = prev.find(p => p.id === u.id || (p.email && u.email && p.email.toLowerCase() === u.email.toLowerCase()));
+              const existing = map.get(u.id) || prev.find(p => p.id === u.id || (p.email && u.email && p.email.toLowerCase() === u.email.toLowerCase()));
               const originalPassword = u.password || existing?.password || (INITIAL_ACCOUNTS.find(a => a.id === u.id || a.email.toLowerCase() === u.email.toLowerCase())?.password);
               map.set(u.id, {
                 ...existing,

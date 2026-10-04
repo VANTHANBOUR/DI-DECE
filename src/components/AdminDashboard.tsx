@@ -60,6 +60,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     showToast,
     updateAccount,
     deleteAccount,
+    deleteLessonPlan,
     openSignUpModal,
     openProfileModal,
     levels,
@@ -83,6 +84,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   
   // Batch selection
   const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState<boolean>(false);
+  const [planToDelete, setPlanToDelete] = useState<LessonPlan | null>(null);
+  const [isDeletingPlans, setIsDeletingPlans] = useState<boolean>(false);
   const [selectedCampusFilter, setSelectedCampusFilter] = useState<string>('all');
   const [activeAdminSubTab, setActiveAdminSubTab] = useState<'submissions' | 'compliance_matrix' | 'staff' | 'classrooms_levels' | 'network_monitor'>('submissions');
   const [editingStaffUser, setEditingStaffUser] = useState<UserAccount | null>(null);
@@ -179,6 +183,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   };
 
+  const selectAllFiltered = () => {
+    const allFilteredIds = filteredPlans.map(p => p.id);
+    if (selectedPlanIds.length === allFilteredIds.length && allFilteredIds.length > 0) {
+      setSelectedPlanIds([]);
+    } else {
+      setSelectedPlanIds(allFilteredIds);
+    }
+  };
+
   const handleBatchApprove = () => {
     if (selectedPlanIds.length === 0) {
       showToast('Select at least one submitted lesson plan to approve.', 'warning');
@@ -192,6 +205,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       origin: { y: 0.6 },
       colors: ['#007A43', '#F59E0B', '#10B981'],
     });
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedPlanIds.length === 0) return;
+    setIsDeletingPlans(true);
+    try {
+      for (const id of selectedPlanIds) {
+        await deleteLessonPlan(id);
+      }
+      setSelectedPlanIds([]);
+      setShowBatchDeleteConfirm(false);
+    } finally {
+      setIsDeletingPlans(false);
+    }
+  };
+
+  const confirmDeleteSinglePlan = async () => {
+    if (planToDelete) {
+      setIsDeletingPlans(true);
+      try {
+        await deleteLessonPlan(planToDelete.id);
+      } finally {
+        setIsDeletingPlans(false);
+        setPlanToDelete(null);
+      }
+    }
   };
 
   const activeCampus = selectedCampusId ? CAMPUS_LIST.find(c => c.id === selectedCampusId) : null;
@@ -959,7 +998,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               {/* Batch Action Bar */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={selectAllPending}
                   className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
@@ -968,14 +1007,44 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <span>Select Pending ({filteredPlans.filter(p => p.status === 'submitted').length})</span>
                 </button>
 
+                <button
+                  onClick={selectAllFiltered}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+                >
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  <span>Select All ({filteredPlans.length})</span>
+                </button>
+
                 {selectedPlanIds.length > 0 && (
-                  <button
-                    onClick={handleBatchApprove}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-[#007A43] hover:bg-[#006338] text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95 animate-in fade-in"
-                  >
-                    <CheckCircle2 className="w-4 h-4 text-amber-300" />
-                    <span>Approve Selected ({selectedPlanIds.length})</span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2 p-1 bg-slate-50 border border-slate-200 rounded-2xl animate-in fade-in zoom-in-95">
+                    <span className="px-2.5 text-xs font-black text-slate-800">
+                      {selectedPlanIds.length} Selected
+                    </span>
+
+                    <button
+                      onClick={handleBatchApprove}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#007A43] hover:bg-[#006338] text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Approve Selected ({selectedPlanIds.length})</span>
+                    </button>
+
+                    <button
+                      onClick={() => setShowBatchDeleteConfirm(true)}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all active:scale-95"
+                      title="Permanently remove all selected plans from Cloud Firestore database"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Delete All Selected from Database ({selectedPlanIds.length})</span>
+                    </button>
+
+                    <button
+                      onClick={() => setSelectedPlanIds([])}
+                      className="px-2 py-1.5 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-200 rounded-xl font-bold transition-colors"
+                    >
+                      Clear
+                    </button>
+                  </div>
                 )}
               </div>
             </div>
@@ -1207,6 +1276,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <ShieldCheck className="w-4 h-4 text-amber-300" />
                         <span>{plan.status === 'approved' ? 'View & Evaluate' : 'Review & Evaluate'}</span>
                       </button>
+                      <button
+                        onClick={() => setPlanToDelete(plan)}
+                        className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded-xl transition-all"
+                        title="Delete lesson plan from database"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </div>
                 );
@@ -1255,6 +1331,106 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Batch Lesson Plans Deletion Modal */}
+      {showBatchDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-rose-100 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-2.5 bg-rose-100 rounded-xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">Delete Selected From Database</h3>
+                <p className="text-xs text-slate-500">Irreversible Cloud Database Action</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to permanently delete all <strong className="text-slate-900">{selectedPlanIds.length} selected lesson plan(s)</strong> from the database? All records, submissions, and teacher feedback will be permanently purged from Cloud Firestore.
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isDeletingPlans}
+                onClick={() => setShowBatchDeleteConfirm(false)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingPlans}
+                onClick={handleBatchDelete}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors"
+              >
+                {isDeletingPlans ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Deleting {selectedPlanIds.length} Plans...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete All Selected From Database</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Single Lesson Plan Deletion Modal */}
+      {planToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-rose-100 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-2.5 bg-rose-100 rounded-xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">Delete Lesson Plan</h3>
+                <p className="text-xs text-slate-500">Irreversible Cloud Database Action</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to permanently delete the lesson plan <strong className="text-slate-900">"{planToDelete.themeTitle}"</strong> (Week {planToDelete.weekNumber} · {planToDelete.className}) submitted by <strong className="text-slate-900">{planToDelete.teacherName}</strong> from the database?
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isDeletingPlans}
+                onClick={() => setPlanToDelete(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingPlans}
+                onClick={confirmDeleteSinglePlan}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors"
+              >
+                {isDeletingPlans ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Deleting from database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Plan From Database</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

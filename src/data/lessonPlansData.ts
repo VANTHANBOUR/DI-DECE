@@ -433,6 +433,7 @@ interface TeacherConfig {
 }
 
 const TEACHERS_CONFIG: TeacherConfig[] = [
+  // DCH SYW
   {
     id: 'teacher_alice',
     name: 'Teacher Alice Henderson',
@@ -440,49 +441,199 @@ const TEACHERS_CONFIG: TeacherConfig[] = [
     email: 'alice.henderson@deweychildcare.edu.kh',
     campusId: 'DCH_SYW',
     classId: 'cls_butterflies',
-    className: 'Pre-School - Butterflies',
+    className: 'Pre-School - Rainbow Butterflies',
     ageGroup: 'Pre-School'
   },
+  {
+    id: 'teacher_kalyan',
+    name: 'Teacher Kalyan Meas',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    email: 'kalyan.meas@deweychildcare.edu.kh',
+    campusId: 'DCH_SYW',
+    classId: 'cls_explorers',
+    className: 'Pre-Nursery - Little Ducklings',
+    ageGroup: 'Pre-Nursery'
+  },
+  {
+    id: 'teacher_rithy',
+    name: 'Teacher Rithy Men',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+    email: 'rithy.men@deweychildcare.edu.kh',
+    campusId: 'DCH_SYW',
+    classId: 'cls_bunnies_syw',
+    className: 'Nursery - Bunnies',
+    ageGroup: 'Nursery'
+  },
+  {
+    id: 'teacher_davy',
+    name: 'Teacher Davy Nget',
+    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80',
+    email: 'davy.nget@deweychildcare.edu.kh',
+    campusId: 'DCH_SYW',
+    classId: 'cls_owls_syw',
+    className: 'Kindergarten - Smart Owls',
+    ageGroup: 'Kindergarten'
+  },
+
+  // DCH SESSOR
   {
     id: 'teacher_sokha',
     name: 'Teacher Sokha Chem',
     avatar: 'https://images.unsplash.com/photo-1580894732488-b22306f6e5ae?w=150&auto=format&fit=crop&q=80',
     email: 'sokha.chem@deweychildcare.edu.kh',
     campusId: 'DCH_SESSOR',
-    classId: 'cls_rainbow',
-    className: 'Kindergarten - Rainbow',
+    classId: 'cls_lotus',
+    className: 'Kindergarten - Little Explorers',
     ageGroup: 'Kindergarten'
   },
   {
-    id: 'teacher_meiling',
-    name: 'Teacher Mei-Ling Zhang',
-    avatar: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150&auto=format&fit=crop&q=80',
-    email: 'meiling.zhang@deweychildcare.edu.kh',
-    campusId: 'DCH_BMC',
+    id: 'teacher_moni',
+    name: 'Teacher Monika Chea',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
+    email: 'monika.chea@deweychildcare.edu.kh',
+    campusId: 'DCH_SESSOR',
+    classId: 'cls_honeybees_sessor',
+    className: 'Pre-School - Honey Bees',
+    ageGroup: 'Pre-School'
+  },
+  {
+    id: 'teacher_vannak',
+    name: 'Teacher Vannak Lay',
+    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
+    email: 'vannak.lay@deweychildcare.edu.kh',
+    campusId: 'DCH_SESSOR',
     classId: 'cls_pandas',
-    className: 'Nursery - Pandas',
+    className: 'Nursery - Panda Cubs',
     ageGroup: 'Nursery'
   },
   {
-    id: 'teacher_david',
-    name: 'Teacher David Miller',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    email: 'david.miller@deweychildcare.edu.kh',
-    campusId: 'DK_ROMCHEK_4',
-    classId: 'cls_eagles',
-    className: 'K2 - Eagles',
+    id: 'teacher_sreymom',
+    name: 'Teacher Sreymom Touch',
+    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80',
+    email: 'sreymom.touch@deweychildcare.edu.kh',
+    campusId: 'DCH_SESSOR',
+    classId: 'cls_frogs_sessor',
+    className: 'Pre-Nursery - Little Frogs',
+    ageGroup: 'Pre-Nursery'
+  },
+
+  // DCH BMC
+  {
+    id: 'teacher_meiling',
+    name: 'Teacher Mei-Ling Zhang',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    email: 'meiling.zhang@deweychildcare.edu.kh',
+    campusId: 'DCH_BMC',
+    classId: 'cls_sunshine_bmc',
+    className: 'Nursery - Sunshine',
+    ageGroup: 'Nursery'
+  },
+  {
+    id: 'teacher_veasna',
+    name: 'Teacher Veasna Bun',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+    email: 'veasna.bun@deweychildcare.edu.kh',
+    campusId: 'DCH_BMC',
+    classId: 'cls_lions_bmc',
+    className: 'Kindergarten - Lion Cubs',
     ageGroup: 'Kindergarten'
   },
   {
+    id: 'teacher_tevy',
+    name: 'Teacher Tevy Khun',
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+    email: 'tevy.khun@deweychildcare.edu.kh',
+    campusId: 'DCH_BMC',
+    classId: 'cls_otters_bmc',
+    className: 'Pre-School - Sea Otters',
+    ageGroup: 'Pre-School'
+  },
+  {
+    id: 'teacher_bopha',
+    name: 'Teacher Bopha Rin',
+    avatar: 'https://images.unsplash.com/photo-1580894732488-b22306f6e5ae?w=150&auto=format&fit=crop&q=80',
+    email: 'bopha.rin@deweychildcare.edu.kh',
+    campusId: 'DCH_BMC',
+    classId: 'cls_stars_bmc',
+    className: 'Pre-Nursery - Little Stars',
+    ageGroup: 'Pre-Nursery'
+  },
+
+  // DK ROMCHEK 4
+  {
+    id: 'teacher_david',
+    name: 'Teacher David Miller',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    email: 'david.miller@deweychildcare.edu.kh',
+    campusId: 'DK_ROMCHEK_4',
+    classId: 'cls_eagles',
+    className: 'Kindergarten - Tigers',
+    ageGroup: 'Kindergarten'
+  },
+  {
+    id: 'teacher_chantha',
+    name: 'Teacher Chantha Sam',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    email: 'chantha.sam@deweychildcare.edu.kh',
+    campusId: 'DK_ROMCHEK_4',
+    classId: 'cls_butterflies_romchek',
+    className: 'Pre-School - Busy Butterflies',
+    ageGroup: 'Pre-School'
+  },
+  {
+    id: 'teacher_vanna',
+    name: 'Teacher Vanna Teng',
+    avatar: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150&auto=format&fit=crop&q=80',
+    email: 'vanna.teng@deweychildcare.edu.kh',
+    campusId: 'DK_ROMCHEK_4',
+    classId: 'cls_lambs_romchek',
+    className: 'Nursery - Little Lambs',
+    ageGroup: 'Nursery'
+  },
+  {
+    id: 'teacher_kiri',
+    name: 'Teacher Kiri Pen',
+    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
+    email: 'kiri.pen@deweychildcare.edu.kh',
+    campusId: 'DK_ROMCHEK_4',
+    classId: 'cls_chicks_romchek',
+    className: 'Pre-Nursery - Little Chicks',
+    ageGroup: 'Pre-Nursery'
+  },
+
+  // DK BOREY ROMCHEK
+  {
     id: 'teacher_chamnan',
     name: 'Teacher Chamnan Vong',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
     email: 'chamnan.vong@deweychildcare.edu.kh',
     campusId: 'DK_BOREY_ROMCHEK',
     classId: 'cls_sunflowers',
-    className: 'K1 - Sunflowers',
+    className: 'Pre-School - Little Spiders',
+    ageGroup: 'Pre-School'
+  },
+  {
+    id: 'teacher_leakhena',
+    name: 'Teacher Leakhena Eng',
+    avatar: 'https://images.unsplash.com/photo-1580894732488-b22306f6e5ae?w=150&auto=format&fit=crop&q=80',
+    email: 'leakhena.eng@deweychildcare.edu.kh',
+    campusId: 'DK_BOREY_ROMCHEK',
+    classId: 'cls_dragonflies_borey',
+    className: 'Kindergarten - Dragonflies',
     ageGroup: 'Kindergarten'
   },
+  {
+    id: 'teacher_dara',
+    name: 'Teacher Dara Heng',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+    email: 'dara.heng@deweychildcare.edu.kh',
+    campusId: 'DK_BOREY_ROMCHEK',
+    classId: 'cls_sparrows_borey',
+    className: 'Nursery - Joyful Sparrows',
+    ageGroup: 'Nursery'
+  },
+
+  // DK OCHAR
   {
     id: 'teacher_neary',
     name: 'Teacher Neary Sophea',
@@ -490,18 +641,40 @@ const TEACHERS_CONFIG: TeacherConfig[] = [
     email: 'neary.sophea@deweychildcare.edu.kh',
     campusId: 'DK_OCHAR',
     classId: 'cls_starfish',
-    className: 'K3 - Starfish',
+    className: 'Kindergarten - Starfish',
     ageGroup: 'Kindergarten'
   },
   {
+    id: 'teacher_ratana',
+    name: 'Teacher Ratana Kong',
+    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80',
+    email: 'ratana.kong@deweychildcare.edu.kh',
+    campusId: 'DK_OCHAR',
+    classId: 'cls_turtles_ochar',
+    className: 'Pre-School - Sea Turtles',
+    ageGroup: 'Pre-School'
+  },
+
+  // DK BMC
+  {
     id: 'teacher_vicheka',
     name: 'Teacher Vicheka Som',
-    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     email: 'vicheka.som@deweychildcare.edu.kh',
     campusId: 'DK_BMC',
     classId: 'cls_dolphins',
-    className: 'K1 - Dolphins',
+    className: 'Kindergarten - Dolphins',
     ageGroup: 'Kindergarten'
+  },
+  {
+    id: 'teacher_thida',
+    name: 'Teacher Thida Mao',
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+    email: 'thida.mao@deweychildcare.edu.kh',
+    campusId: 'DK_BMC',
+    classId: 'cls_eagles_dk_bmc',
+    className: 'Pre-School - Golden Eagles',
+    ageGroup: 'Pre-School'
   }
 ];
 

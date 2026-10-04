@@ -30,7 +30,8 @@ import {
   Search,
   Filter,
   Globe,
-  Building2
+  Building2,
+  Trash2
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -52,6 +53,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     myTotalLessonPlans, 
     allTeacherLessonPlans, 
     submitLessonPlan, 
+    deleteLessonPlan,
     classrooms, 
     showToast, 
     formatAgeGroup, 
@@ -69,6 +71,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [page, setPage] = useState<number>(1);
   const pageSize = 12;
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState<LessonPlan | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   if (!currentUser) return null;
 
@@ -629,6 +633,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                       </button>
                     )}
 
+                    {isOwner && (
+                      <button
+                        onClick={() => setPlanToDelete(plan)}
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 rounded-xl transition-all"
+                        title="Delete lesson plan from database"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+
                     {isOwner && plan.status === 'draft' && (
                       <button
                         onClick={() => submitLessonPlan(plan.id)}
@@ -715,6 +729,66 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
       {/* User Profile Settings Modal */}
       {isProfileModalOpen && (
         <UserProfileModal onClose={() => setIsProfileModalOpen(false)} />
+      )}
+
+      {/* Teacher Plan Deletion Confirmation Modal */}
+      {planToDelete && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border border-rose-100 space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="p-2.5 bg-rose-100 rounded-xl">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">Delete Lesson Plan</h3>
+                <p className="text-xs text-slate-500">Irreversible Cloud Database Action</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Are you sure you want to permanently delete <strong className="text-slate-900">"{planToDelete.themeTitle}"</strong> (Week {planToDelete.weekNumber} · {planToDelete.className}) from the database?
+            </p>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setPlanToDelete(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={async () => {
+                  if (planToDelete) {
+                    setIsDeleting(true);
+                    try {
+                      await deleteLessonPlan(planToDelete.id);
+                    } finally {
+                      setIsDeleting(false);
+                      setPlanToDelete(null);
+                    }
+                  }
+                }}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-400 text-white text-xs font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-colors"
+              >
+                {isDeleting ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Deleting from database...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete Plan From Database</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

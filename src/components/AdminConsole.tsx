@@ -847,14 +847,15 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                         className="flex items-center gap-1.5 px-3.5 py-2 bg-[#007A43] hover:bg-[#006338] text-white text-xs font-bold rounded-xl shadow-xs"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5 text-amber-300" />
-                        <span>Approve ({selectedPlanIds.length})</span>
+                        <span>Approve Selected ({selectedPlanIds.length})</span>
                       </button>
                       <button
                         onClick={handleBatchDelete}
                         className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs"
+                        title="Permanently remove all selected plans from Cloud Firestore database"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
-                        <span>Delete ({selectedPlanIds.length})</span>
+                        <span>Delete All Selected from Database ({selectedPlanIds.length})</span>
                       </button>
                     </>
                   )}
