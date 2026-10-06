@@ -158,17 +158,17 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  IS_LOGGED_IN: 'dch_is_logged_in_v9',
-  SESSION_ACTIVE: 'dch_session_active_v9',
-  CURRENT_USER_ID: 'dch_current_user_id_v9',
-  LOGGED_OUT_EXPLICITLY: 'dch_logged_out_explicitly_v9',
-  ACCOUNTS: 'dch_accounts_v9',
-  LESSON_PLANS: 'dch_lesson_plans_v9',
-  CLASSROOMS: 'dch_classrooms_v9',
-  AUDIT_LOGS: 'dch_audit_logs_v9',
-  SCHOOL_PROFILE: 'dch_school_profile_v9',
-  LEVELS: 'dch_levels_v9',
-  SELECTED_CAMPUS: 'dch_selected_campus_v9',
+  IS_LOGGED_IN: 'dch_is_logged_in_v10',
+  SESSION_ACTIVE: 'dch_session_active_v10',
+  CURRENT_USER_ID: 'dch_current_user_id_v10',
+  LOGGED_OUT_EXPLICITLY: 'dch_logged_out_explicitly_v10',
+  ACCOUNTS: 'dch_accounts_v10',
+  LESSON_PLANS: 'dch_lesson_plans_v10',
+  CLASSROOMS: 'dch_classrooms_v10',
+  AUDIT_LOGS: 'dch_audit_logs_v10',
+  SCHOOL_PROFILE: 'dch_school_profile_v10',
+  LEVELS: 'dch_levels_v10',
+  SELECTED_CAMPUS: 'dch_selected_campus_v10',
 };
 
 // Safe localStorage helper to prevent QuotaExceededError crashes
@@ -183,7 +183,7 @@ const safeLocalStorageSet = (key: string, value: string): boolean => {
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && (k.startsWith('dch_') || k.startsWith('dewey_')) && !k.includes('_v9')) {
+        if (k && (k.startsWith('dch_') || k.startsWith('dewey_')) && !k.includes('_v10')) {
           keysToRemove.push(k);
         }
       }
@@ -936,48 +936,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [currentUser]);
 
-  // Ensure every registered faculty teacher in allAccounts has curriculum lesson plans
-  useEffect(() => {
-    const teachers = allAccounts.filter(a => a.role === 'teacher');
-    let hasNewPlans = false;
-    const missingPlans: LessonPlan[] = [];
-
-    teachers.forEach((teacher, idx) => {
-      const hasPlans = lessonPlans.some(p => isLessonPlanForTeacher(p, teacher));
-      if (!hasPlans) {
-        hasNewPlans = true;
-        const newPlans = generateLessonPlansForTeacher({
-          id: teacher.id,
-          name: teacher.name,
-          avatar: teacher.avatar,
-          email: teacher.email,
-          campusId: teacher.campusId,
-          classId: teacher.assignedClassId,
-          className: teacher.assignedClassName,
-          ageGroup: teacher.ageGroup,
-        }, idx);
-        missingPlans.push(...newPlans);
-      }
-    });
-
-    if (hasNewPlans && missingPlans.length > 0) {
-      setLessonPlans(prev => {
-        const map = new Map<string, LessonPlan>();
-        prev.forEach(p => map.set(p.id, p));
-        missingPlans.forEach(p => map.set(p.id, p));
-        const updated = Array.from(map.values());
-        safeLocalStorageSet(STORAGE_KEYS.LESSON_PLANS, JSON.stringify(updated));
-        return updated;
-      });
-
-      missingPlans.forEach(plan => {
-        try {
-          setDoc(doc(db, 'lessonPlans', plan.id), sanitizeForFirestore(plan), { merge: true }).catch(() => {});
-        } catch {}
-      });
-    }
-  }, [allAccounts, lessonPlans.length]);
-
   const addAuditLog = (action: SystemAuditLog['action'], details: string, targetId?: string) => {
     const now = new Date().toISOString().replace('T', ' ').substring(0, 16);
     const newLog: SystemAuditLog = {
@@ -1002,34 +960,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const generatePlansForAccount = useCallback((userId: string) => {
     const target = allAccounts.find(a => a.id === userId);
     if (!target) return;
-    const newPlans = generateLessonPlansForTeacher({
-      id: target.id,
-      name: target.name,
-      avatar: target.avatar,
-      email: target.email,
-      campusId: target.campusId,
-      classId: target.assignedClassId,
-      className: target.assignedClassName,
-      ageGroup: target.ageGroup,
-    }, 0);
-
-    setLessonPlans(prev => {
-      const map = new Map<string, LessonPlan>();
-      prev.forEach(p => map.set(p.id, p));
-      newPlans.forEach(p => map.set(p.id, p));
-      const updated = Array.from(map.values());
-      safeLocalStorageSet(STORAGE_KEYS.LESSON_PLANS, JSON.stringify(updated));
-      return updated;
-    });
-
-    newPlans.forEach(plan => {
-      try {
-        setDoc(doc(db, 'lessonPlans', plan.id), sanitizeForFirestore(plan), { merge: true }).catch(() => {});
-      } catch {}
-    });
-
-    broadcastLiveSync('FORCE_SYNC_TRIGGERED', { message: `Provisioned 14-week curriculum plans for ${target.name}` });
-    showToast(`Provisioned 14 weekly curriculum plans for ${target.name}!`, 'success');
+    showToast(`Ready to create custom lesson plans for ${target.name}.`, 'info');
   }, [allAccounts]);
 
   const switchUser = (userId: string) => {
@@ -1195,35 +1126,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'active',
       bio: userData.bio || `Authorized ${role.replace('_', ' ')} at Dewey Childcare House.`,
     };
-
-    // If registering a teacher, automatically provision their full set of weekly lesson plans
-    if (role === 'teacher') {
-      const generatedPlans = generateLessonPlansForTeacher({
-        id: newUser.id,
-        name: newUser.name,
-        avatar: newUser.avatar,
-        email: newUser.email,
-        campusId: newUser.campusId,
-        classId: newUser.assignedClassId,
-        className: newUser.assignedClassName,
-        ageGroup: newUser.ageGroup,
-      });
-
-      setLessonPlans(prev => {
-        const map = new Map<string, LessonPlan>();
-        prev.forEach(p => map.set(p.id, p));
-        generatedPlans.forEach(p => map.set(p.id, p));
-        const updated = Array.from(map.values());
-        safeLocalStorageSet(STORAGE_KEYS.LESSON_PLANS, JSON.stringify(updated));
-        return updated;
-      });
-
-      generatedPlans.forEach(plan => {
-        try {
-          setDoc(doc(db, 'lessonPlans', plan.id), sanitizeForFirestore(plan), { merge: true }).catch(() => {});
-        } catch {}
-      });
-    }
 
     // Save to Firestore users collection
     try {

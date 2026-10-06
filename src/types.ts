@@ -235,14 +235,14 @@ export interface Classroom {
   code: string;
   campusId?: CampusId;
   ageGroup: EarlyChildhoodAgeGroup;
-  leadTeacherId: string;
-  leadTeacherName: string;
-  assistantTeacherName: string;
+  leadTeacherId?: string;
+  leadTeacherName?: string;
+  assistantTeacherName?: string;
   enrolledStudents: number;
   capacity: number;
   room: string;
   colorTheme: string;
-  currentTheme: string;
+  currentTheme?: string;
 }
 
 export interface PlanAttachment {

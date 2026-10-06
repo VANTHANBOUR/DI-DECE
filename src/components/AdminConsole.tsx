@@ -746,17 +746,11 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                               <span className="text-[10px] text-slate-400 pl-0.5">
                                 {teacherPlans.filter(p => p.status === 'approved').length} approved · {teacherPlans.filter(p => p.status === 'submitted' || p.status === 'under_review').length} review
                               </span>
-                            ) : user.role === 'teacher' ? (
-                              <button
-                                type="button"
-                                onClick={() => generatePlansForAccount(user.id)}
-                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
-                                title={`Generate full 14-week curriculum plans for ${user.name}`}
-                              >
-                                <Sparkles className="w-3 h-3 text-amber-600" />
-                                <span>Generate Plans</span>
-                              </button>
-                            ) : null}
+                            ) : (
+                              <span className="text-[10px] text-slate-400 pl-0.5">
+                                No submitted plans
+                              </span>
+                            )}
                           </div>
                         );
                       })()}
