@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { LessonPlan, UserAccount, UserRole, Classroom, CAMPUS_LIST, getCampusClassroomOptions, isAdminOrSuperAdmin } from '../types';
+import { isLessonPlanForTeacher, getTeacherLessonPlans } from '../utils/teacherUtils';
 import { StaffManagementModal } from './StaffManagementModal';
 import { ClassroomModal } from './ClassroomModal';
 import { SchoolProfileSettings } from './SchoolProfileSettings';
@@ -39,7 +40,9 @@ import {
   Image as ImageIcon,
   Printer,
   Copy,
-  Check
+  Check,
+  User,
+  MapPin
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -67,7 +70,9 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
     openSignUpModal,
     schoolProfile,
     formatAgeGroup,
-    selectedCampusId
+    selectedCampusId,
+    switchUser,
+    generatePlansForAccount
   } = useApp();
 
   const [activeSubTab, setActiveSubTab] = useState<'users' | 'plans' | 'classrooms' | 'logs' | 'profile'>('users');
@@ -99,6 +104,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   // Master Plans Filters & State
   const [planSearch, setPlanSearch] = useState<string>('');
   const [planStatusFilter, setPlanStatusFilter] = useState<string>('all');
+  const [selectedPlanTeacher, setSelectedPlanTeacher] = useState<string>('all');
   const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
   
   // Deletion confirmations
@@ -113,10 +119,8 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   const [editingClass, setEditingClass] = useState<Classroom | null>(null);
   const [isClassroomModalOpen, setIsClassroomModalOpen] = useState(false);
 
-  // Filtered Users: Admins/Super Admins see all staff accounts; regular users see only their own account
-  const userBase = isSuperOrAdmin 
-    ? allAccounts 
-    : allAccounts.filter(u => u.id === currentUser?.id || (u.email && u.email.toLowerCase() === currentUser?.email.toLowerCase()));
+  // In Admin Console, display all registered staff accounts across the institution
+  const userBase = allAccounts;
 
   const filteredUsers = userBase.filter((u) => {
     if (selectedConsoleCampus !== 'all') {
@@ -130,26 +134,25 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
       return (
         u.name.toLowerCase().includes(q) ||
         u.email.toLowerCase().includes(q) ||
+        (u.khmerName && u.khmerName.toLowerCase().includes(q)) ||
         (u.assignedClassName && u.assignedClassName.toLowerCase().includes(q))
       );
     }
     return true;
   });
 
-  // Filtered Plans: Admins/Super Admins see all; regular staff see only their own plans
-  const planBase = isSuperOrAdmin 
-    ? lessonPlans 
-    : lessonPlans.filter(p => 
-        p.teacherId === currentUser?.id || 
-        (p.teacherEmail && p.teacherEmail.toLowerCase() === currentUser?.email.toLowerCase()) ||
-        (p.teacherName && currentUser?.name && p.teacherName.toLowerCase() === currentUser?.name.toLowerCase())
-      );
+  // Filtered Plans: In the Admin Console Master Curriculum tab, show all institutional lesson plans
+  const planBase = lessonPlans;
 
   const filteredPlans = planBase.filter((p) => {
     if (selectedConsoleCampus !== 'all') {
       if (!isPlanFromCampus(p, selectedConsoleCampus, classrooms, allAccounts)) return false;
     }
     if (planStatusFilter !== 'all' && p.status !== planStatusFilter) return false;
+    if (selectedPlanTeacher !== 'all') {
+      const targetTeacher = allAccounts.find(a => a.id === selectedPlanTeacher);
+      if (targetTeacher && !isLessonPlanForTeacher(p, targetTeacher)) return false;
+    }
     if (planSearch.trim()) {
       const q = planSearch.toLowerCase();
       return (
@@ -510,6 +513,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                   <th className="py-3 px-4">Assigned Position</th>
                   <th className="py-3 px-4">Institutional Role (RBAC)</th>
                   <th className="py-3 px-4">Classroom Allocation</th>
+                  <th className="py-3 px-4">Lesson Plans</th>
                   <th className="py-3 px-4">Original Password (Firebase)</th>
                   <th className="py-3 px-4">Account Status</th>
                   <th className="py-3 px-4 text-right">Administrative Actions</th>
@@ -573,7 +577,23 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                         </button>
                       </div>
                       {user.roomNumber && (
-                        <p className="text-[10px] text-slate-400 mt-0.5">{user.roomNumber}</p>
+                        <div className="text-[10px] text-slate-500 mt-1 flex flex-wrap items-center gap-1">
+                          <span className="flex items-center gap-0.5 text-slate-600 font-semibold">
+                            <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                            {user.roomNumber}
+                          </span>
+                          {(() => {
+                            const officeMate = allAccounts.find(a => a.id !== user.id && a.campusId === user.campusId && a.roomNumber === user.roomNumber);
+                            if (officeMate) {
+                              return (
+                                <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.2 rounded-md">
+                                  Office mate: {officeMate.name}
+                                </span>
+                              );
+                            }
+                            return null;
+                          })()}
+                        </div>
                       )}
                     </td>
 
@@ -703,6 +723,45 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                       )}
                     </td>
 
+                    {/* Lesson Plans */}
+                    <td className="py-3.5 px-4">
+                      {(() => {
+                        const teacherPlans = getTeacherLessonPlans(lessonPlans, user);
+                        return (
+                          <div className="flex flex-col gap-1">
+                            <button
+                              onClick={() => {
+                                setSelectedConsoleCampus('all');
+                                setSelectedPlanTeacher(user.id);
+                                setActiveSubTab('plans');
+                              }}
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 rounded-xl text-xs font-bold transition-all text-left shadow-2xs group cursor-pointer"
+                              title={`Click to view all ${teacherPlans.length} lesson plans for ${user.name}`}
+                            >
+                              <BookOpen className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition-transform shrink-0" />
+                              <span>{teacherPlans.length} Plans</span>
+                              <span className="text-[10px] text-blue-600 underline ml-0.5">View</span>
+                            </button>
+                            {teacherPlans.length > 0 ? (
+                              <span className="text-[10px] text-slate-400 pl-0.5">
+                                {teacherPlans.filter(p => p.status === 'approved').length} approved · {teacherPlans.filter(p => p.status === 'submitted' || p.status === 'under_review').length} review
+                              </span>
+                            ) : user.role === 'teacher' ? (
+                              <button
+                                type="button"
+                                onClick={() => generatePlansForAccount(user.id)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                                title={`Generate full 14-week curriculum plans for ${user.name}`}
+                              >
+                                <Sparkles className="w-3 h-3 text-amber-600" />
+                                <span>Generate Plans</span>
+                              </button>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
+                    </td>
+
                     {/* Password Credentials */}
                     <td className="py-3.5 px-4">
                       {(() => {
@@ -788,6 +847,17 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                           <Edit3 className="w-3.5 h-3.5 text-emerald-700" />
                           <span>{isSuperOrAdmin ? 'Manage' : 'Edit Details'}</span>
                         </button>
+
+                        {user.id !== currentUser.id && (
+                          <button
+                            onClick={() => switchUser(user.id)}
+                            className="px-2.5 py-1 text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                            title={`Log in as ${user.name} to view their account dashboard & lesson plans`}
+                          >
+                            <User className="w-3.5 h-3.5 text-emerald-700" />
+                            <span>Switch to Account</span>
+                          </button>
+                        )}
 
                         {isSuperOrAdmin && (
                           <button
@@ -894,6 +964,25 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                   <option value="draft">Drafts</option>
                 </select>
               </div>
+
+              {isSuperOrAdmin && (
+                <div className="flex items-center gap-1.5">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase">Teacher:</label>
+                  <select
+                    value={selectedPlanTeacher}
+                    onChange={(e) => setSelectedPlanTeacher(e.target.value)}
+                    className="px-3 py-1.5 bg-blue-50/70 border border-blue-200 rounded-xl text-xs font-bold text-blue-950 max-w-[220px]"
+                  >
+                    <option value="all">👩‍🏫 All Faculty Staff ({allAccounts.length})</option>
+                    {allAccounts.map(t => {
+                      const count = getTeacherLessonPlans(lessonPlans, t).length;
+                      return (
+                        <option key={t.id} value={t.id}>{t.name} ({count} plans)</option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 

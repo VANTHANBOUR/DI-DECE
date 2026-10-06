@@ -433,385 +433,388 @@ interface TeacherConfig {
 }
 
 const TEACHERS_CONFIG: TeacherConfig[] = [
-  // DCH SYW
   {
-    id: 'teacher_alice',
-    name: 'Teacher Alice Henderson',
+    id: 'teacher_donnah_canonoy',
+    name: 'Teacher Donnah Rose Canonoy',
     avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    email: 'alice.henderson@deweychildcare.edu.kh',
+    email: 'donnah.canonoy@deweychildcare.edu.kh',
     campusId: 'DCH_SYW',
     classId: 'cls_butterflies',
-    className: 'Pre-School - Rainbow Butterflies',
+    className: 'Pre-School - Butterflies',
     ageGroup: 'Pre-School'
   },
   {
-    id: 'teacher_kalyan',
-    name: 'Teacher Kalyan Meas',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    email: 'kalyan.meas@deweychildcare.edu.kh',
-    campusId: 'DCH_SYW',
-    classId: 'cls_explorers',
-    className: 'Pre-Nursery - Little Ducklings',
-    ageGroup: 'Pre-Nursery'
-  },
-  {
-    id: 'teacher_rithy',
-    name: 'Teacher Rithy Men',
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
-    email: 'rithy.men@deweychildcare.edu.kh',
-    campusId: 'DCH_SYW',
-    classId: 'cls_bunnies_syw',
-    className: 'Nursery - Bunnies',
-    ageGroup: 'Nursery'
-  },
-  {
-    id: 'teacher_davy',
-    name: 'Teacher Davy Nget',
-    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80',
-    email: 'davy.nget@deweychildcare.edu.kh',
-    campusId: 'DCH_SYW',
-    classId: 'cls_owls_syw',
-    className: 'Kindergarten - Smart Owls',
-    ageGroup: 'Kindergarten'
-  },
-
-  // DCH SESSOR
-  {
-    id: 'teacher_sokha',
-    name: 'Teacher Sokha Chem',
+    id: 'teacher_moeurn_sreynuch',
+    name: 'Teacher Moeurn Sreynuch',
     avatar: 'https://images.unsplash.com/photo-1580894732488-b22306f6e5ae?w=150&auto=format&fit=crop&q=80',
-    email: 'sokha.chem@deweychildcare.edu.kh',
-    campusId: 'DCH_SESSOR',
-    classId: 'cls_lotus',
-    className: 'Kindergarten - Little Explorers',
-    ageGroup: 'Kindergarten'
-  },
-  {
-    id: 'teacher_moni',
-    name: 'Teacher Monika Chea',
-    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
-    email: 'monika.chea@deweychildcare.edu.kh',
-    campusId: 'DCH_SESSOR',
-    classId: 'cls_honeybees_sessor',
-    className: 'Pre-School - Honey Bees',
-    ageGroup: 'Pre-School'
-  },
-  {
-    id: 'teacher_vannak',
-    name: 'Teacher Vannak Lay',
-    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-    email: 'vannak.lay@deweychildcare.edu.kh',
+    email: 'sreynuch.moeurn@deweychildcare.edu.kh',
     campusId: 'DCH_SESSOR',
     classId: 'cls_pandas',
-    className: 'Nursery - Panda Cubs',
+    className: 'Nursery - Pandas',
     ageGroup: 'Nursery'
   },
   {
-    id: 'teacher_sreymom',
-    name: 'Teacher Sreymom Touch',
-    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80',
-    email: 'sreymom.touch@deweychildcare.edu.kh',
-    campusId: 'DCH_SESSOR',
-    classId: 'cls_frogs_sessor',
-    className: 'Pre-Nursery - Little Frogs',
-    ageGroup: 'Pre-Nursery'
-  },
-
-  // DCH BMC
-  {
-    id: 'teacher_meiling',
-    name: 'Teacher Mei-Ling Zhang',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    email: 'meiling.zhang@deweychildcare.edu.kh',
-    campusId: 'DCH_BMC',
-    classId: 'cls_sunshine_bmc',
-    className: 'Nursery - Sunshine',
-    ageGroup: 'Nursery'
-  },
-  {
-    id: 'teacher_veasna',
-    name: 'Teacher Veasna Bun',
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
-    email: 'veasna.bun@deweychildcare.edu.kh',
-    campusId: 'DCH_BMC',
-    classId: 'cls_lions_bmc',
-    className: 'Kindergarten - Lion Cubs',
-    ageGroup: 'Kindergarten'
-  },
-  {
-    id: 'teacher_tevy',
-    name: 'Teacher Tevy Khun',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    email: 'tevy.khun@deweychildcare.edu.kh',
-    campusId: 'DCH_BMC',
-    classId: 'cls_otters_bmc',
-    className: 'Pre-School - Sea Otters',
-    ageGroup: 'Pre-School'
-  },
-  {
-    id: 'teacher_bopha',
-    name: 'Teacher Bopha Rin',
-    avatar: 'https://images.unsplash.com/photo-1580894732488-b22306f6e5ae?w=150&auto=format&fit=crop&q=80',
-    email: 'bopha.rin@deweychildcare.edu.kh',
-    campusId: 'DCH_BMC',
-    classId: 'cls_stars_bmc',
-    className: 'Pre-Nursery - Little Stars',
-    ageGroup: 'Pre-Nursery'
-  },
-
-  // DK ROMCHEK 4
-  {
-    id: 'teacher_david',
-    name: 'Teacher David Miller',
-    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
-    email: 'david.miller@deweychildcare.edu.kh',
-    campusId: 'DK_ROMCHEK_4',
-    classId: 'cls_eagles',
-    className: 'Kindergarten - Tigers',
-    ageGroup: 'Kindergarten'
-  },
-  {
-    id: 'teacher_chantha',
-    name: 'Teacher Chantha Sam',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
-    email: 'chantha.sam@deweychildcare.edu.kh',
-    campusId: 'DK_ROMCHEK_4',
-    classId: 'cls_butterflies_romchek',
-    className: 'Pre-School - Busy Butterflies',
-    ageGroup: 'Pre-School'
-  },
-  {
-    id: 'teacher_vanna',
-    name: 'Teacher Vanna Teng',
+    id: 'teacher_gesille_viola',
+    name: 'Teacher Gesille Viola',
     avatar: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?w=150&auto=format&fit=crop&q=80',
-    email: 'vanna.teng@deweychildcare.edu.kh',
-    campusId: 'DK_ROMCHEK_4',
-    classId: 'cls_lambs_romchek',
-    className: 'Nursery - Little Lambs',
-    ageGroup: 'Nursery'
-  },
-  {
-    id: 'teacher_kiri',
-    name: 'Teacher Kiri Pen',
-    avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
-    email: 'kiri.pen@deweychildcare.edu.kh',
-    campusId: 'DK_ROMCHEK_4',
-    classId: 'cls_chicks_romchek',
-    className: 'Pre-Nursery - Little Chicks',
-    ageGroup: 'Pre-Nursery'
-  },
-
-  // DK BOREY ROMCHEK
-  {
-    id: 'teacher_chamnan',
-    name: 'Teacher Chamnan Vong',
-    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
-    email: 'chamnan.vong@deweychildcare.edu.kh',
-    campusId: 'DK_BOREY_ROMCHEK',
-    classId: 'cls_sunflowers',
-    className: 'Pre-School - Little Spiders',
-    ageGroup: 'Pre-School'
-  },
-  {
-    id: 'teacher_leakhena',
-    name: 'Teacher Leakhena Eng',
-    avatar: 'https://images.unsplash.com/photo-1580894732488-b22306f6e5ae?w=150&auto=format&fit=crop&q=80',
-    email: 'leakhena.eng@deweychildcare.edu.kh',
-    campusId: 'DK_BOREY_ROMCHEK',
-    classId: 'cls_dragonflies_borey',
-    className: 'Kindergarten - Dragonflies',
+    email: 'gesille.viola@deweychildcare.edu.kh',
+    campusId: 'DCH_BMC',
+    classId: 'cls_lotus',
+    className: 'Kindergarten - Lotus',
     ageGroup: 'Kindergarten'
   },
   {
-    id: 'teacher_dara',
-    name: 'Teacher Dara Heng',
-    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
-    email: 'dara.heng@deweychildcare.edu.kh',
-    campusId: 'DK_BOREY_ROMCHEK',
-    classId: 'cls_sparrows_borey',
-    className: 'Nursery - Joyful Sparrows',
-    ageGroup: 'Nursery'
-  },
-
-  // DK OCHAR
-  {
-    id: 'teacher_neary',
-    name: 'Teacher Neary Sophea',
+    id: 'teacher_vann_chanreaksa',
+    name: 'Teacher Vann Chanreaksa',
     avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80',
-    email: 'neary.sophea@deweychildcare.edu.kh',
+    email: 'chanreaksa.vann@deweychildcare.edu.kh',
+    campusId: 'DK_ROMCHEK_4',
+    classId: 'cls_sunflowers',
+    className: 'K1 - Sunflowers',
+    ageGroup: 'Kindergarten'
+  },
+  {
+    id: 'teacher_kristine_keley',
+    name: 'Teacher Kristine Mae Keley',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    email: 'kristine.maekeley@diu.edu.kh',
+    campusId: 'DK_BOREY_ROMCHEK',
+    classId: 'cls_eagles_dkbr',
+    className: 'K2 - Eagles',
+    ageGroup: 'Kindergarten'
+  },
+  {
+    id: 'teacher_jose_antaran',
+    name: 'Teacher Jose Noriel F. Antaran',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    email: 'jose.antaran@deweychildcare.edu.kh',
     campusId: 'DK_OCHAR',
     classId: 'cls_starfish',
-    className: 'Kindergarten - Starfish',
+    className: 'K3 - Starfish',
     ageGroup: 'Kindergarten'
   },
   {
-    id: 'teacher_ratana',
-    name: 'Teacher Ratana Kong',
-    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80',
-    email: 'ratana.kong@deweychildcare.edu.kh',
-    campusId: 'DK_OCHAR',
-    classId: 'cls_turtles_ochar',
-    className: 'Pre-School - Sea Turtles',
-    ageGroup: 'Pre-School'
-  },
-
-  // DK BMC
-  {
-    id: 'teacher_vicheka',
-    name: 'Teacher Vicheka Som',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    email: 'vicheka.som@deweychildcare.edu.kh',
+    id: 'teacher_joan_calibayan',
+    name: 'Teacher Joan Mesamen Calibayan',
+    avatar: 'https://images.unsplash.com/photo-1548142813-c348350df52b?w=150&auto=format&fit=crop&q=80',
+    email: 'joan.calibayan@deweychildcare.edu.kh',
     campusId: 'DK_BMC',
     classId: 'cls_dolphins',
-    className: 'Kindergarten - Dolphins',
+    className: 'K1 - Dolphins',
     ageGroup: 'Kindergarten'
   },
   {
-    id: 'teacher_thida',
-    name: 'Teacher Thida Mao',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
-    email: 'thida.mao@deweychildcare.edu.kh',
-    campusId: 'DK_BMC',
-    classId: 'cls_eagles_dk_bmc',
-    className: 'Pre-School - Golden Eagles',
+    id: 'teacher_geraldine_fungan',
+    name: 'Teacher Geraldine Fungan',
+    avatar: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+    email: 'geraldine.fungan@deweychildcare.edu.kh',
+    campusId: 'DCH_SYW',
+    classId: 'cls_explorers',
+    className: 'Pre-Nursery - Explorers',
+    ageGroup: 'Pre-Nursery'
+  },
+  {
+    id: 'teacher_bonieve_seachrist',
+    name: 'Teacher Bonieve Seachrist',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    email: 'bonieve.seachrist@deweychildcare.edu.kh',
+    campusId: 'DCH_SESSOR',
+    classId: 'cls_koalas',
+    className: 'Pre-School - Koalas',
     ageGroup: 'Pre-School'
+  },
+  {
+    id: 'teacher_yin_savet',
+    name: 'Teacher Yin Savet',
+    avatar: 'https://images.unsplash.com/photo-1594744803329-e58b31de8bf5?w=150&auto=format&fit=crop&q=80',
+    email: 'savet.yin@deweychildcare.edu.kh',
+    campusId: 'DCH_BMC',
+    classId: 'cls_lotus',
+    className: 'Kindergarten - Lotus',
+    ageGroup: 'Kindergarten'
+  },
+  {
+    id: 'teacher_maylene_bour',
+    name: 'Teacher Maylene Bour',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    email: 'maylene.bour@deweychildcare.edu.kh',
+    campusId: 'DCH_SYW',
+    classId: 'cls_rainbow',
+    className: 'Pre-School - Rainbow',
+    ageGroup: 'Pre-School'
+  },
+  {
+    id: 'teacher_moeun_mary',
+    name: 'Teacher Moeun Mary',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
+    email: 'mary.moeun@deweychildcare.edu.kh',
+    campusId: 'DCH_SESSOR',
+    classId: 'cls_garden',
+    className: 'Nursery - Garden',
+    ageGroup: 'Nursery'
+  },
+  {
+    id: 'teacher_mao_sophanna',
+    name: 'Teacher Mao Sophanna',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    email: 'sophanna.mao@deweychildcare.edu.kh',
+    campusId: 'DK_ROMCHEK_4',
+    classId: 'cls_tigers',
+    className: 'K2 - Tigers',
+    ageGroup: 'Kindergarten'
+  },
+  {
+    id: 'teacher_vanthan_bour',
+    name: 'Teacher Vanthan Bour',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+    email: 'vanthan.bour@deweychildcare.edu.kh',
+    campusId: 'DCH_SYW',
+    classId: 'cls_rainbow',
+    className: 'Pre-School - Rainbow',
+    ageGroup: 'Pre-School'
+  },
+  {
+    id: 'teacher_annie_ledesma',
+    name: 'Teacher Annie Grace Ledesma',
+    avatar: 'https://images.unsplash.com/photo-1560250097-0b93528c311a?w=150&auto=format&fit=crop&q=80',
+    email: 'annie.ledesma@deweychildcare.edu.kh',
+    campusId: 'DK_BOREY_ROMCHEK',
+    classId: 'cls_sunflowers_dkbr',
+    className: 'K1 - Sunflowers',
+    ageGroup: 'Kindergarten'
+  },
+  {
+    id: 'teacher_sharon_widell',
+    name: 'Teacher Sharon Widell',
+    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80',
+    email: 'sharon.widell@deweychildcare.edu.kh',
+    campusId: 'DK_OCHAR',
+    classId: 'cls_ocean',
+    className: 'K3 - Ocean Wonders',
+    ageGroup: 'Kindergarten'
+  },
+  {
+    id: 'teacher_mika_facinag',
+    name: 'Teacher Mika Ella Facinag',
+    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=150&auto=format&fit=crop&q=80',
+    email: 'mika.facinag@deweychildcare.edu.kh',
+    campusId: 'DK_BMC',
+    classId: 'cls_bluebirds',
+    className: 'K2 - Bluebirds',
+    ageGroup: 'Kindergarten'
+  },
+  {
+    id: 'teacher_jessa_gaspar',
+    name: 'Teacher Jessa Gaspar',
+    avatar: 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=150&auto=format&fit=crop&q=80',
+    email: 'jessa.gaspar@deweychildcare.edu.kh',
+    campusId: 'DCH_SYW',
+    classId: 'cls_stars',
+    className: 'Pre-School - Little Stars',
+    ageGroup: 'Pre-School'
+  },
+  {
+    id: 'teacher_kimmie_nonn',
+    name: 'Teacher Kimmie Nonn',
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80',
+    email: 'kimmie.nonn@deweychildcare.edu.kh',
+    campusId: 'DCH_SESSOR',
+    classId: 'cls_blossoms',
+    className: 'Nursery - Blossoms',
+    ageGroup: 'Nursery'
+  },
+  {
+    id: 'teacher_eugenia_francisco',
+    name: 'Teacher Eugenia Francisco',
+    avatar: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=150&auto=format&fit=crop&q=80',
+    email: 'eugenia.francisco@deweychildcare.edu.kh',
+    campusId: 'DK_ROMCHEK_4',
+    classId: 'cls_explorers_dk',
+    className: 'K1 - Explorers',
+    ageGroup: 'Kindergarten'
+  },
+  {
+    id: 'teacher_elaine_mamigo',
+    name: 'Teacher Elaine Grace De Asis Mamigo',
+    avatar: 'https://images.unsplash.com/photo-1580894732488-b22306f6e5ae?w=150&auto=format&fit=crop&q=80',
+    email: 'elaine.mamigo@deweychildcare.edu.kh',
+    campusId: 'DK_BOREY_ROMCHEK',
+    classId: 'cls_lions_dkbr',
+    className: 'K2 - Lions',
+    ageGroup: 'Kindergarten'
+  },
+  {
+    id: 'teacher_tith_radim',
+    name: 'Teacher Tith Radim',
+    avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
+    email: 'radim.tith@deweychildcare.edu.kh',
+    campusId: 'DK_OCHAR',
+    classId: 'cls_discoverers',
+    className: 'K2 - Discoverers',
+    ageGroup: 'Kindergarten'
   }
 ];
+
+export const generateLessonPlansForTeacher = (
+  teacher: {
+    id: string;
+    name: string;
+    avatar?: string;
+    email?: string;
+    campusId?: any;
+    classId?: string;
+    className?: string;
+    ageGroup?: any;
+  },
+  tIdx: number = 0
+): LessonPlan[] => {
+  const cleanId = (teacher.id || '').replace(/^teacher_/, '').replace(/^fb_/, '');
+  const teacherId = teacher.id;
+  const teacherName = teacher.name;
+  const teacherAvatar = teacher.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80';
+  const teacherEmail = teacher.email || `${cleanId}@deweychildcare.edu.kh`;
+  const campusId = teacher.campusId || 'DCH_SYW';
+  const classId = teacher.classId || 'cls_butterflies';
+  const className = teacher.className || 'Pre-School';
+  const ageGroup = teacher.ageGroup || 'Pre-School';
+
+  return WEEKLY_CURRICULUM_TEMPLATES.map((tmpl) => {
+    const planId = `lp_2026_w${tmpl.week}_${cleanId}`;
+
+    // Determine realistic review status based on week number and teacher
+    let status: LessonPlan['status'] = 'approved';
+    if (tmpl.week === 12) {
+      if (tIdx % 7 === 1) status = 'revision_requested';
+      else if (tIdx % 7 === 2 || tIdx % 7 === 3) status = 'submitted';
+      else status = 'approved';
+    } else if (tmpl.week === 13) {
+      status = tIdx % 2 === 0 ? 'submitted' : 'under_review';
+    } else if (tmpl.week > 13) {
+      status = 'draft';
+    }
+
+    const plan: LessonPlan = {
+      id: planId,
+      teacherId,
+      teacherName,
+      teacherAvatar,
+      teacherEmail,
+      campusId: campusId as any,
+      classId,
+      className,
+      ageGroup,
+      weekNumber: tmpl.week,
+      term: 'Term 1 (Academic Year 2026)',
+      startDate: tmpl.startDate,
+      endDate: tmpl.endDate,
+      themeTitle: tmpl.themeTitle,
+      themeDescription: tmpl.themeDescription,
+      domains: tmpl.domains as any,
+      learningObjectives: tmpl.learningObjectives,
+      circleTimeActivities: tmpl.circleTime,
+      learningCenters: tmpl.centers.map((c, idx) => ({
+        id: `lc_${tmpl.week}_${idx}`,
+        centerName: c.name,
+        activityDescription: c.activity,
+        materials: c.materials,
+      })),
+      outdoorSensoryPlay: tmpl.outdoorPlay,
+      trilingualFocus: {
+        englishVocab: tmpl.englishVocab,
+        khmerVocab: tmpl.khmerVocab,
+        chineseVocab: tmpl.chineseVocab,
+        songOrRhyme: tmpl.song,
+        storyBook: tmpl.storyBook,
+      },
+      assessmentMethods: 'Anecdotal notes, checklist rubric, and visual portfolio photos.',
+      materialsAndSupplies: tmpl.centers.map(c => c.materials),
+      planDate: tmpl.startDate,
+      timeStart: '08:00 AM',
+      timeEnd: '11:30 AM',
+      warmUpCircleTime: tmpl.circleTime,
+      firstSession: {
+        subject: `${tmpl.domains[0] || 'Early Discovery'}: Core Inquiry`,
+        activities: [
+          {
+            id: `act_${tmpl.week}_1`,
+            topicActivity: tmpl.centers[0]?.activity || 'Inquiry exploration activity',
+            objectives: tmpl.learningObjectives[0] || 'Understand core topic concept',
+            materialsSources: tmpl.centers[0]?.materials || 'Activity resources',
+            durationMins: 30,
+          }
+        ]
+      },
+      secondSession: {
+        subject: `${tmpl.domains[1] || 'Creative Arts'}: Guided Expression`,
+        activities: [
+          {
+            id: `act_${tmpl.week}_2`,
+            topicActivity: tmpl.centers[1]?.activity || 'Creative hands-on workshop',
+            objectives: tmpl.learningObjectives[1] || 'Express creativity and fine motor coordination',
+            materialsSources: tmpl.centers[1]?.materials || 'Art resources',
+            durationMins: 30,
+          }
+        ]
+      },
+      closing: 'Reflective circle time sharing, cooperative clean-up, and farewell rhyme.',
+      attachments: [
+        {
+          id: `att_${tmpl.week}_1`,
+          name: `Week_${tmpl.week}_Curriculum_Guide.pdf`,
+          size: '1.8 MB',
+          type: 'pdf',
+          uploadedAt: `${tmpl.startDate} 08:30`,
+        }
+      ],
+      status: status,
+      createdAt: `${tmpl.startDate} 07:45`,
+      updatedAt: `${tmpl.startDate} 08:00`,
+      submittedAt: status !== 'draft' ? `${tmpl.startDate} 08:15` : undefined,
+      reviewedAt: status === 'approved' ? `${tmpl.startDate} 16:30` : undefined,
+      feedbackHistory: status === 'approved' ? [
+        {
+          id: `fb_${tmpl.week}`,
+          reviewerId: 'officer_piseth',
+          reviewerName: 'Mr. Piseth Vanthan Bour',
+          reviewerRole: 'academic_officer',
+          date: `${tmpl.startDate} 16:30`,
+          comment: `Exceptional adherence to early childhood EYFS and trilingual immersion standards for Week ${tmpl.week}. Approved for institutional implementation.`,
+          actionTaken: 'approved',
+          rubricScores: {
+            curriculumAlignment: 5,
+            trilingualIntegration: 5,
+            sensorySafety: 5,
+            differentiation: 5,
+          },
+        }
+      ] : status === 'revision_requested' ? [
+        {
+          id: `fb_rev_${tmpl.week}`,
+          reviewerId: 'officer_piseth',
+          reviewerName: 'Mr. Piseth Vanthan Bour',
+          reviewerRole: 'academic_officer',
+          date: `${tmpl.startDate} 14:20`,
+          comment: `Please incorporate additional safety measures for small manipulative materials and specify Mandarin phonics reinforcement.`,
+          actionTaken: 'revision_requested',
+          rubricScores: {
+            curriculumAlignment: 4,
+            trilingualIntegration: 3,
+            sensorySafety: 3,
+            differentiation: 4,
+          },
+        }
+      ] : [],
+    };
+
+    return plan;
+  });
+};
 
 export const generateAllLessonPlans = (): LessonPlan[] => {
   const allPlans: LessonPlan[] = [];
 
-  TEACHERS_CONFIG.forEach((teacher) => {
-    WEEKLY_CURRICULUM_TEMPLATES.forEach((tmpl) => {
-      const planId = `lp_2026_w${tmpl.week}_${teacher.id.replace('teacher_', '')}`;
-      
-      // Determine realistic review status based on week number
-      let status: LessonPlan['status'] = 'approved';
-      if (tmpl.week === 12) {
-        if (teacher.id === 'teacher_david') status = 'revision_requested';
-        else if (teacher.id === 'teacher_meiling' || teacher.id === 'teacher_vicheka') status = 'submitted';
-        else status = 'approved';
-      } else if (tmpl.week === 13) {
-        status = 'submitted';
-      } else if (tmpl.week > 13) {
-        status = 'draft';
-      }
-
-      const plan: LessonPlan = {
-        id: planId,
-        teacherId: teacher.id,
-        teacherName: teacher.name,
-        teacherAvatar: teacher.avatar,
-        teacherEmail: teacher.email,
-        campusId: teacher.campusId as any,
-        classId: teacher.classId,
-        className: teacher.className,
-        ageGroup: teacher.ageGroup,
-        weekNumber: tmpl.week,
-        term: 'Term 1 (Academic Year 2026)',
-        startDate: tmpl.startDate,
-        endDate: tmpl.endDate,
-        themeTitle: tmpl.themeTitle,
-        themeDescription: tmpl.themeDescription,
-        domains: tmpl.domains as any,
-        learningObjectives: tmpl.learningObjectives,
-        circleTimeActivities: tmpl.circleTime,
-        learningCenters: tmpl.centers.map((c, idx) => ({
-          id: `lc_${tmpl.week}_${idx}`,
-          centerName: c.name,
-          activityDescription: c.activity,
-          materials: c.materials,
-        })),
-        outdoorSensoryPlay: tmpl.outdoorPlay,
-        trilingualFocus: {
-          englishVocab: tmpl.englishVocab,
-          khmerVocab: tmpl.khmerVocab,
-          chineseVocab: tmpl.chineseVocab,
-          songOrRhyme: tmpl.song,
-          storyBook: tmpl.storyBook,
-        },
-        assessmentMethods: 'Anecdotal notes, checklist rubric, and visual portfolio photos.',
-        materialsAndSupplies: tmpl.centers.map(c => c.materials),
-        planDate: tmpl.startDate,
-        timeStart: '08:00 AM',
-        timeEnd: '11:30 AM',
-        warmUpCircleTime: tmpl.circleTime,
-        firstSession: {
-          subject: `${tmpl.domains[0] || 'Early Discovery'}: Core Inquiry`,
-          activities: [
-            {
-              id: `act_${tmpl.week}_1`,
-              topicActivity: tmpl.centers[0]?.activity || 'Inquiry exploration activity',
-              objectives: tmpl.learningObjectives[0] || 'Understand core topic concept',
-              materialsSources: tmpl.centers[0]?.materials || 'Activity resources',
-              durationMins: 30,
-            }
-          ]
-        },
-        secondSession: {
-          subject: `${tmpl.domains[1] || 'Creative Arts'}: Guided Expression`,
-          activities: [
-            {
-              id: `act_${tmpl.week}_2`,
-              topicActivity: tmpl.centers[1]?.activity || 'Creative hands-on workshop',
-              objectives: tmpl.learningObjectives[1] || 'Express creativity and fine motor coordination',
-              materialsSources: tmpl.centers[1]?.materials || 'Art resources',
-              durationMins: 30,
-            }
-          ]
-        },
-        closing: 'Reflective circle time sharing, cooperative clean-up, and farewell rhyme.',
-        attachments: [
-          {
-            id: `att_${tmpl.week}_1`,
-            name: `Week_${tmpl.week}_Curriculum_Guide.pdf`,
-            size: '1.8 MB',
-            type: 'pdf',
-            uploadedAt: `${tmpl.startDate} 08:30`,
-          }
-        ],
-        status: status,
-        createdAt: `${tmpl.startDate} 07:45`,
-        updatedAt: `${tmpl.startDate} 08:00`,
-        submittedAt: status !== 'draft' ? `${tmpl.startDate} 08:15` : undefined,
-        reviewedAt: status === 'approved' ? `${tmpl.startDate} 16:30` : undefined,
-        feedbackHistory: status === 'approved' ? [
-          {
-            id: `fb_${tmpl.week}`,
-            reviewerId: 'officer_piseth',
-            reviewerName: 'Mr. Piseth Vanthan',
-            reviewerRole: 'academic_officer',
-            date: `${tmpl.startDate} 16:30`,
-            comment: `Exceptional adherence to early childhood EYFS and trilingual immersion standards for Week ${tmpl.week}. Approved for institutional implementation.`,
-            actionTaken: 'approved',
-            rubricScores: {
-              curriculumAlignment: 5,
-              trilingualIntegration: 5,
-              sensorySafety: 5,
-              differentiation: 5,
-            },
-          }
-        ] : status === 'revision_requested' ? [
-          {
-            id: `fb_rev_${tmpl.week}`,
-            reviewerId: 'officer_piseth',
-            reviewerName: 'Mr. Piseth Vanthan',
-            reviewerRole: 'academic_officer',
-            date: `${tmpl.startDate} 14:20`,
-            comment: `Please incorporate additional safety measures for small manipulative materials and specify Mandarin phonics reinforcement.`,
-            actionTaken: 'revision_requested',
-            rubricScores: {
-              curriculumAlignment: 4,
-              trilingualIntegration: 3,
-              sensorySafety: 3,
-              differentiation: 4,
-            },
-          }
-        ] : [],
-      };
-
-      allPlans.push(plan);
-    });
+  TEACHERS_CONFIG.forEach((teacher, tIdx) => {
+    allPlans.push(...generateLessonPlansForTeacher(teacher, tIdx));
   });
 
   return allPlans;

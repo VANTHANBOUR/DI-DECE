@@ -4,6 +4,7 @@ import { UserAccount, CAMPUS_LIST, LessonPlan } from '../types';
 import { UserAvatar } from './UserAvatar';
 import { StaffManagementModal } from './StaffManagementModal';
 import { formatDateRange } from '../utils/dateUtils';
+import { getTeacherLessonPlans } from '../utils/teacherUtils';
 import { 
   Users, 
   Search, 
@@ -102,11 +103,7 @@ export const TeachersDirectory: React.FC<TeachersDirectoryProps> = ({
 
   // Helper to retrieve all lesson plans submitted by a specific staff member
   const getTeacherPlans = (staff: UserAccount): LessonPlan[] => {
-    return lessonPlans.filter(p => 
-      p.teacherId === staff.id || 
-      (p.teacherEmail && p.teacherEmail.toLowerCase() === staff.email.toLowerCase()) ||
-      (p.teacherName && p.teacherName.toLowerCase() === staff.name.toLowerCase())
-    );
+    return getTeacherLessonPlans(lessonPlans, staff);
   };
 
   const getStatusBadge = (status: LessonPlan['status']) => {
@@ -481,6 +478,22 @@ export const TeachersDirectory: React.FC<TeachersDirectoryProps> = ({
                         </span>
                       </div>
                     )}
+
+                    {(() => {
+                      const officeMate = allAccounts.find(a => a.id !== staff.id && a.campusId === staff.campusId && a.roomNumber === staff.roomNumber);
+                      if (!officeMate) return null;
+                      return (
+                        <div className="flex items-center justify-between text-slate-600 bg-emerald-50/60 p-1.5 rounded-xl border border-emerald-200/60">
+                          <span className="text-emerald-800 font-bold text-[11px] flex items-center gap-1">
+                            <Users className="w-3.5 h-3.5 text-emerald-600" />
+                            Office Mate:
+                          </span>
+                          <span className="font-bold text-emerald-950 text-[11px]">
+                            {officeMate.name}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Submitted Works Section (Directly on the Teacher Card) */}

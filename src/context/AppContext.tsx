@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { Classroom, LessonPlan, PlanAttachment, SchoolProfile, SystemAuditLog, UserAccount, UserRole, WeeklyComplianceRecord, SchoolLevel, CampusId, CAMPUS_LIST, isCentralHQUser, isAdminOrSuperAdmin } from '../types';
 import { INITIAL_ACCOUNTS, INITIAL_AUDIT_LOGS, INITIAL_CLASSROOMS, INITIAL_LESSON_PLANS, INITIAL_SCHOOL_PROFILE } from '../data/mockData';
+import { generateLessonPlansForTeacher } from '../data/lessonPlansData';
+import { isLessonPlanForTeacher, getTeacherLessonPlans } from '../utils/teacherUtils';
 import { isPlanFromCampus } from '../utils/campusUtils';
 import { 
   auth, 
@@ -33,9 +35,7 @@ import {
   deleteDoc, 
   updateDoc,
   serverTimestamp,
-  onSnapshot,
-  query,
-  where
+  onSnapshot 
 } from 'firebase/firestore';
 
 export type NavigationTab = 
@@ -59,7 +59,7 @@ interface AppContextType {
   signInWithGoogle: () => Promise<boolean>;
   signOut: () => Promise<void>;
   updateAccount: (userId: string, updates: Partial<UserAccount>) => void;
-  deleteAccount: (userId: string) => Promise<boolean>;
+  deleteAccount: (userId: string) => void;
   registerTeacher: (teacherData: Partial<UserAccount>) => Promise<UserAccount | null>;
   
   // Firebase State & Live Cloud Push
@@ -97,7 +97,7 @@ interface AppContextType {
   // Actions
   createLessonPlan: (planData: Omit<LessonPlan, 'id' | 'createdAt' | 'updatedAt' | 'feedbackHistory'>) => LessonPlan;
   updateLessonPlan: (id: string, updates: Partial<LessonPlan>) => void;
-  deleteLessonPlan: (id: string) => Promise<boolean>;
+  deleteLessonPlan: (id: string) => void;
   submitLessonPlan: (id: string) => void;
   
   // Admin & Academic Officer Actions
@@ -152,24 +152,23 @@ interface AppContextType {
   toggleGlobalSignUp: (disabled?: boolean) => Promise<void>;
   toggleCampusSignUp: (campusId: CampusId, disabled?: boolean) => Promise<void>;
   isSignUpAllowedForCampus: (campusId: CampusId) => boolean;
+  generatePlansForAccount: (userId: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  IS_LOGGED_IN: 'dch_is_logged_in_v6',
-  SESSION_ACTIVE: 'dch_session_active_v6',
-  CURRENT_USER_ID: 'dch_current_user_id_v6',
-  LOGGED_OUT_EXPLICITLY: 'dch_logged_out_explicitly_v6',
-  ACCOUNTS: 'dch_accounts_v6',
-  DELETED_ACCOUNTS: 'dch_deleted_accounts_v6',
-  LESSON_PLANS: 'dch_lesson_plans_v6',
-  DELETED_PLANS: 'dch_deleted_plans_v6',
-  CLASSROOMS: 'dch_classrooms_v6',
-  AUDIT_LOGS: 'dch_audit_logs_v6',
-  SCHOOL_PROFILE: 'dch_school_profile_v6',
-  LEVELS: 'dch_levels_v6',
-  SELECTED_CAMPUS: 'dch_selected_campus_v6',
+  IS_LOGGED_IN: 'dch_is_logged_in_v9',
+  SESSION_ACTIVE: 'dch_session_active_v9',
+  CURRENT_USER_ID: 'dch_current_user_id_v9',
+  LOGGED_OUT_EXPLICITLY: 'dch_logged_out_explicitly_v9',
+  ACCOUNTS: 'dch_accounts_v9',
+  LESSON_PLANS: 'dch_lesson_plans_v9',
+  CLASSROOMS: 'dch_classrooms_v9',
+  AUDIT_LOGS: 'dch_audit_logs_v9',
+  SCHOOL_PROFILE: 'dch_school_profile_v9',
+  LEVELS: 'dch_levels_v9',
+  SELECTED_CAMPUS: 'dch_selected_campus_v9',
 };
 
 // Safe localStorage helper to prevent QuotaExceededError crashes
@@ -184,7 +183,7 @@ const safeLocalStorageSet = (key: string, value: string): boolean => {
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && (k.startsWith('dch_') || k.startsWith('dewey_')) && !k.includes('_v6')) {
+        if (k && (k.startsWith('dch_') || k.startsWith('dewey_')) && !k.includes('_v9')) {
           keysToRemove.push(k);
         }
       }
@@ -249,55 +248,6 @@ const safeLocalStorageGet = (key: string): string | null => {
 const safeLocalStorageRemove = (key: string): void => {
   try {
     localStorage.removeItem(key);
-  } catch {}
-};
-
-// Permanent deleted accounts register to guarantee deleted users never resurrect from seeds or cache
-const getDeletedUserIds = (): Set<string> => {
-  try {
-    const saved = safeLocalStorageGet(STORAGE_KEYS.DELETED_ACCOUNTS);
-    if (saved) {
-      const arr = JSON.parse(saved);
-      if (Array.isArray(arr)) {
-        const s = new Set<string>(arr.map((item: string) => String(item).toLowerCase().trim()));
-        s.add('admin_principal');
-        s.add('principal.sopheak@deweychildcare.edu.kh');
-        return s;
-      }
-    }
-  } catch {}
-  return new Set<string>(['admin_principal', 'principal.sopheak@deweychildcare.edu.kh']);
-};
-
-const addDeletedUserId = (idOrEmail: string): void => {
-  if (!idOrEmail) return;
-  try {
-    const set = getDeletedUserIds();
-    set.add(idOrEmail.toLowerCase().trim());
-    safeLocalStorageSet(STORAGE_KEYS.DELETED_ACCOUNTS, JSON.stringify(Array.from(set)));
-  } catch {}
-};
-
-// Permanent deleted lesson plans register to guarantee deleted plans never resurrect from seeds or cache
-const getDeletedPlanIds = (): Set<string> => {
-  try {
-    const saved = safeLocalStorageGet(STORAGE_KEYS.DELETED_PLANS);
-    if (saved) {
-      const arr = JSON.parse(saved);
-      if (Array.isArray(arr)) {
-        return new Set<string>(arr.map((item: string) => String(item).trim()));
-      }
-    }
-  } catch {}
-  return new Set<string>();
-};
-
-const addDeletedPlanId = (id: string): void => {
-  if (!id) return;
-  try {
-    const set = getDeletedPlanIds();
-    set.add(id.trim());
-    safeLocalStorageSet(STORAGE_KEYS.DELETED_PLANS, JSON.stringify(Array.from(set)));
   } catch {}
 };
 
@@ -386,36 +336,23 @@ const processImageFileToDataUrl = (file: File): Promise<string> => {
 };
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Accounts - Initialized with all 34 registered institutional accounts, preserving modifications
+  // Accounts - Always merge all INITIAL_ACCOUNTS so all teachers & Central HQ officers are present
   const [allAccounts, setAllAccounts] = useState<UserAccount[]>(() => {
     try {
-      const deletedIds = getDeletedUserIds();
-      const map = new Map<string, UserAccount>();
-      INITIAL_ACCOUNTS.forEach(a => {
-        const idKey = a.id.toLowerCase();
-        const emailKey = (a.email || '').toLowerCase().trim();
-        if (!deletedIds.has(idKey) && !deletedIds.has(emailKey)) {
-          map.set(a.id, a);
-        }
-      });
       const saved = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          const map = new Map<string, UserAccount>();
+          INITIAL_ACCOUNTS.forEach(a => map.set(a.id, a));
           parsed.forEach((a: UserAccount) => {
-            const idKey = (a.id || '').toLowerCase();
-            const emailKey = (a.email || '').toLowerCase().trim();
-            if (!deletedIds.has(idKey) && !deletedIds.has(emailKey)) {
-              if (map.has(a.id)) {
-                map.set(a.id, { ...map.get(a.id)!, ...a });
-              } else {
-                map.set(a.id, a);
-              }
-            }
+            const existing = map.get(a.id);
+            map.set(a.id, { ...existing, ...a });
           });
+          return Array.from(map.values());
         }
       }
-      return Array.from(map.values()).filter(a => !deletedIds.has(a.id.toLowerCase()) && !deletedIds.has((a.email || '').toLowerCase().trim()) && !a.name?.includes('Sopheak'));
+      return INITIAL_ACCOUNTS;
     } catch {
       return INITIAL_ACCOUNTS;
     }
@@ -445,16 +382,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       const userId = safeLocalStorageGet(STORAGE_KEYS.CURRENT_USER_ID);
       const saved = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
-      const rawAccounts: UserAccount[] = saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
-      const accounts = rawAccounts.filter(a => a.id !== 'admin_principal' && !a.name?.includes('Sopheak') && !a.email?.toLowerCase().includes('principal.sopheak'));
-      if (userId && userId !== 'admin_principal') {
+      const accounts: UserAccount[] = saved ? JSON.parse(saved) : INITIAL_ACCOUNTS;
+      if (userId) {
         const found = accounts.find(a => a.id === userId);
         if (found) return found;
       }
       // Default to Mr. Piseth Vanthan (officer_piseth, vanthanbour@diu.edu.kh)
-      return accounts.find(a => a.email === 'vanthanbour@diu.edu.kh') || accounts[0] || INITIAL_ACCOUNTS[0];
+      return accounts.find(a => a.email === 'vanthanbour@diu.edu.kh') || INITIAL_ACCOUNTS[1] || INITIAL_ACCOUNTS[0];
     } catch {
-      return INITIAL_ACCOUNTS[0];
+      return INITIAL_ACCOUNTS[1] || INITIAL_ACCOUNTS[0];
     }
   });
 
@@ -490,32 +426,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   });
 
-  // Lesson Plans - Initialized from all registered accounts and saved storage, excluding deleted plans
+  // Lesson Plans - Guaranteed all 10 teacher submissions are merged and visible
   const [lessonPlans, setLessonPlans] = useState<LessonPlan[]>(() => {
     try {
-      const deletedPlanIds = getDeletedPlanIds();
-      const map = new Map<string, LessonPlan>();
-      INITIAL_LESSON_PLANS.forEach(p => {
-        if (!deletedPlanIds.has(p.id)) {
-          map.set(p.id, p);
-        }
-      });
       const saved = safeLocalStorageGet(STORAGE_KEYS.LESSON_PLANS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
+          const map = new Map<string, LessonPlan>();
+          // 1. Seed all 10 initial submissions
+          INITIAL_LESSON_PLANS.forEach(p => map.set(p.id, p));
+          // 2. Overlay any saved plan updates while preserving all 10 entries
           parsed.forEach((p: LessonPlan) => {
-            if (!deletedPlanIds.has(p.id)) {
-              if (map.has(p.id)) {
-                map.set(p.id, { ...map.get(p.id)!, ...p });
-              } else {
-                map.set(p.id, p);
-              }
+            if (map.has(p.id)) {
+              map.set(p.id, { ...map.get(p.id)!, ...p });
+            } else {
+              map.set(p.id, p);
             }
           });
+          return Array.from(map.values());
         }
       }
-      return Array.from(map.values()).filter(p => !deletedPlanIds.has(p.id));
+      return INITIAL_LESSON_PLANS;
     } catch {
       return INITIAL_LESSON_PLANS;
     }
@@ -607,21 +539,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Test Firebase Firestore Connection on Mount & listen to Auth
   useEffect(() => {
-    // Ensure Madam Sopheak Rath is completely removed from localStorage and Firestore database
-    try {
-      const savedAccountsStr = safeLocalStorageGet(STORAGE_KEYS.ACCOUNTS);
-      if (savedAccountsStr && (savedAccountsStr.includes('admin_principal') || savedAccountsStr.includes('Sopheak'))) {
-        const parsed = JSON.parse(savedAccountsStr);
-        const filtered = parsed.filter((a: any) => a.id !== 'admin_principal' && !a.name?.includes('Sopheak') && !a.email?.toLowerCase().includes('principal.sopheak'));
-        safeLocalStorageSet(STORAGE_KEYS.ACCOUNTS, JSON.stringify(filtered));
-      }
-      const activeUser = safeLocalStorageGet(STORAGE_KEYS.CURRENT_USER_ID);
-      if (activeUser === 'admin_principal') {
-        safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER_ID, 'officer_piseth');
-      }
-      deleteDoc(doc(db, 'users', 'admin_principal')).catch(() => {});
-    } catch {}
-
     testFirestoreConnection().then(status => {
       setIsFirebaseConnected(status.isConnected);
       setIsQuotaExceeded(false);
@@ -749,22 +666,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } else if (type === 'ACCOUNTS_UPDATED') {
             const accounts = data as UserAccount[];
             setAllAccounts(accounts);
-          } else if (type === 'ACCOUNT_DELETED') {
-            const { userId, email } = (data || {}) as { userId: string; email?: string };
-            if (userId) {
-              addDeletedUserId(userId);
-              if (email) addDeletedUserId(email);
-              setAllAccounts(prev => prev.filter(a => a.id !== userId && a.email?.toLowerCase() !== email?.toLowerCase()));
-            }
-          } else if (type === 'PLAN_DELETED') {
-            const planId = typeof data === 'string' ? data : (data as any)?.id;
-            if (planId) {
-              addDeletedPlanId(planId);
-              setLessonPlans(prev => prev.filter(p => p.id !== planId));
-              if (selectedPlan?.id === planId) {
-                setSelectedPlan(null);
-              }
-            }
           } else if (type === 'FORCE_SYNC_TRIGGERED') {
             if (data?.timestamp) {
               setLastSyncedAt(data.timestamp);
@@ -791,12 +692,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } else if (e.key === STORAGE_KEYS.ACCOUNTS) {
           const acc = JSON.parse(e.newValue);
           setAllAccounts(acc);
-        } else if (e.key === STORAGE_KEYS.DELETED_ACCOUNTS) {
-          const deletedIds = getDeletedUserIds();
-          setAllAccounts(prev => prev.filter(a => !deletedIds.has(a.id.toLowerCase()) && !deletedIds.has(a.email?.toLowerCase())));
-        } else if (e.key === STORAGE_KEYS.DELETED_PLANS) {
-          const deletedPlans = getDeletedPlanIds();
-          setLessonPlans(prev => prev.filter(p => !deletedPlans.has(p.id)));
         }
       } catch {}
     };
@@ -857,18 +752,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               });
             }
 
-            const deletedPlanIds = getDeletedPlanIds();
             const planMap = new Map<string, LessonPlan>();
-
-            // Remote database plans are the authoritative source
+            prev.forEach(p => planMap.set(p.id, p));
             remotePlans.forEach(p => {
-              if (deletedPlanIds.has(p.id)) {
-                try {
-                  deleteDoc(doc(db, 'lessonPlans', p.id)).catch(() => {});
-                } catch {}
-                return;
-              }
-              const local = prev.find(item => item.id === p.id);
+              const local = planMap.get(p.id);
               if (!local) {
                 planMap.set(p.id, p);
               } else {
@@ -876,20 +763,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 const remoteUpdated = p.updatedAt || p.createdAt || '';
                 if (remoteUpdated >= localUpdated) {
                   planMap.set(p.id, p);
-                } else {
-                  planMap.set(p.id, local);
                 }
               }
             });
-
-            // Keep locally-created drafts not yet uploaded, provided they aren't deleted
-            prev.forEach(localPlan => {
-              if (localPlan.id.startsWith('local_') && !deletedPlanIds.has(localPlan.id) && !planMap.has(localPlan.id)) {
-                planMap.set(localPlan.id, localPlan);
-              }
-            });
-
-            const updatedPlans = Array.from(planMap.values()).filter(p => !deletedPlanIds.has(p.id));
+            const updatedPlans = Array.from(planMap.values());
 
             if (selectedPlan) {
               const fresh = updatedPlans.find(p => p.id === selectedPlan.id);
@@ -980,40 +857,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
         if (!snapshot.empty) {
-          const deletedIds = getDeletedUserIds();
           const remoteUsers: UserAccount[] = [];
           snapshot.forEach(docSnap => {
             const docData = docSnap.data() as UserAccount;
-            const docId = docSnap.id.toLowerCase();
-            const docEmail = (docData.email || '').toLowerCase().trim();
-            if (deletedIds.has(docId) || deletedIds.has(docEmail) || docSnap.id === 'admin_principal' || (docData.name && docData.name.includes('Sopheak'))) {
-              try {
-                deleteDoc(doc(db, 'users', docSnap.id)).catch(() => {});
-              } catch {}
-              return;
-            }
             remoteUsers.push({ ...docData, id: docSnap.id });
           });
           setAllAccounts(prev => {
             const map = new Map<string, UserAccount>();
-            INITIAL_ACCOUNTS.forEach(a => {
-              const idKey = a.id.toLowerCase();
-              const emailKey = (a.email || '').toLowerCase().trim();
-              if (!deletedIds.has(idKey) && !deletedIds.has(emailKey)) {
-                map.set(a.id, a);
-              }
-            });
-            prev.forEach(a => {
-              const idKey = a.id.toLowerCase();
-              const emailKey = (a.email || '').toLowerCase().trim();
-              if (!deletedIds.has(idKey) && !deletedIds.has(emailKey)) {
-                map.set(a.id, a);
-              }
-            });
-            // Remote database users collection is the authoritative source
+            INITIAL_ACCOUNTS.forEach(a => map.set(a.id, a));
+            prev.forEach(u => map.set(u.id, u));
             remoteUsers.forEach(u => {
-              if (deletedIds.has(u.id.toLowerCase()) || deletedIds.has((u.email || '').toLowerCase().trim())) return;
-              const existing = map.get(u.id) || prev.find(p => p.id === u.id || (p.email && u.email && p.email.toLowerCase() === u.email.toLowerCase()));
+              const existing = map.get(u.id);
               const originalPassword = u.password || existing?.password || (INITIAL_ACCOUNTS.find(a => a.id === u.id || a.email.toLowerCase() === u.email.toLowerCase())?.password);
               map.set(u.id, {
                 ...existing,
@@ -1021,7 +875,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 ...(originalPassword ? { password: originalPassword } : {})
               });
             });
-            const merged = Array.from(map.values()).filter(u => !deletedIds.has(u.id.toLowerCase()) && !deletedIds.has((u.email || '').toLowerCase().trim()) && !u.name?.includes('Sopheak'));
+            const merged = Array.from(map.values());
             
             if (currentUser) {
               const freshCurrentUser = merged.find(u => u.id === currentUser.id);
@@ -1037,58 +891,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       handleSnapshotError(e, 'users');
     }
 
-    // 9. Listen for real-time Deleted Accounts tombstones from Firestore
-    let unsubDeletedAccounts: (() => void) | null = null;
-    try {
-      unsubDeletedAccounts = onSnapshot(collection(db, 'deletedAccounts'), (snapshot) => {
-        if (!snapshot.empty) {
-          const currentDeleted = getDeletedUserIds();
-          let hasNew = false;
-          snapshot.forEach(docSnap => {
-            const idKey = docSnap.id.toLowerCase();
-            if (!currentDeleted.has(idKey)) {
-              currentDeleted.add(idKey);
-              hasNew = true;
-            }
-            const data = docSnap.data();
-            if (data?.email) {
-              const emailKey = String(data.email).toLowerCase().trim();
-              if (!currentDeleted.has(emailKey)) {
-                currentDeleted.add(emailKey);
-                hasNew = true;
-              }
-            }
-          });
-          if (hasNew) {
-            safeLocalStorageSet(STORAGE_KEYS.DELETED_ACCOUNTS, JSON.stringify(Array.from(currentDeleted)));
-            setAllAccounts(prev => prev.filter(u => !currentDeleted.has(u.id.toLowerCase()) && !currentDeleted.has((u.email || '').toLowerCase().trim())));
-          }
-        }
-      }, () => {});
-    } catch {}
-
-    // 10. Listen for real-time Deleted Lesson Plans tombstones from Firestore
-    let unsubDeletedPlans: (() => void) | null = null;
-    try {
-      unsubDeletedPlans = onSnapshot(collection(db, 'deletedPlans'), (snapshot) => {
-        if (!snapshot.empty) {
-          const currentDeleted = getDeletedPlanIds();
-          let hasNew = false;
-          snapshot.forEach(docSnap => {
-            const planId = docSnap.id.trim();
-            if (!currentDeleted.has(planId)) {
-              currentDeleted.add(planId);
-              hasNew = true;
-            }
-          });
-          if (hasNew) {
-            safeLocalStorageSet(STORAGE_KEYS.DELETED_PLANS, JSON.stringify(Array.from(currentDeleted)));
-            setLessonPlans(prev => prev.filter(p => !currentDeleted.has(p.id)));
-          }
-        }
-      }, () => {});
-    } catch {}
-
     return () => {
       if (unsubPlans) unsubPlans();
       if (unsubClassrooms) unsubClassrooms();
@@ -1096,14 +898,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (unsubLogs) unsubLogs();
       if (unsubProfile) unsubProfile();
       if (unsubUsers) unsubUsers();
-      if (unsubDeletedAccounts) unsubDeletedAccounts();
-      if (unsubDeletedPlans) unsubDeletedPlans();
       if (bc) bc.close();
       if (typeof window !== 'undefined') {
         window.removeEventListener('storage', handleStorageEvent);
       }
     };
-  }, [isAuthenticated, currentUser?.id]);
+  }, [isAuthenticated, currentUser?.id, isQuotaExceeded]);
 
   // Sync to local storage
   useEffect(() => {
@@ -1136,6 +936,48 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [currentUser]);
 
+  // Ensure every registered faculty teacher in allAccounts has curriculum lesson plans
+  useEffect(() => {
+    const teachers = allAccounts.filter(a => a.role === 'teacher');
+    let hasNewPlans = false;
+    const missingPlans: LessonPlan[] = [];
+
+    teachers.forEach((teacher, idx) => {
+      const hasPlans = lessonPlans.some(p => isLessonPlanForTeacher(p, teacher));
+      if (!hasPlans) {
+        hasNewPlans = true;
+        const newPlans = generateLessonPlansForTeacher({
+          id: teacher.id,
+          name: teacher.name,
+          avatar: teacher.avatar,
+          email: teacher.email,
+          campusId: teacher.campusId,
+          classId: teacher.assignedClassId,
+          className: teacher.assignedClassName,
+          ageGroup: teacher.ageGroup,
+        }, idx);
+        missingPlans.push(...newPlans);
+      }
+    });
+
+    if (hasNewPlans && missingPlans.length > 0) {
+      setLessonPlans(prev => {
+        const map = new Map<string, LessonPlan>();
+        prev.forEach(p => map.set(p.id, p));
+        missingPlans.forEach(p => map.set(p.id, p));
+        const updated = Array.from(map.values());
+        safeLocalStorageSet(STORAGE_KEYS.LESSON_PLANS, JSON.stringify(updated));
+        return updated;
+      });
+
+      missingPlans.forEach(plan => {
+        try {
+          setDoc(doc(db, 'lessonPlans', plan.id), sanitizeForFirestore(plan), { merge: true }).catch(() => {});
+        } catch {}
+      });
+    }
+  }, [allAccounts, lessonPlans.length]);
+
   const addAuditLog = (action: SystemAuditLog['action'], details: string, targetId?: string) => {
     const now = new Date().toISOString().replace('T', ' ').substring(0, 16);
     const newLog: SystemAuditLog = {
@@ -1156,6 +998,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Offline fallback
     }
   };
+
+  const generatePlansForAccount = useCallback((userId: string) => {
+    const target = allAccounts.find(a => a.id === userId);
+    if (!target) return;
+    const newPlans = generateLessonPlansForTeacher({
+      id: target.id,
+      name: target.name,
+      avatar: target.avatar,
+      email: target.email,
+      campusId: target.campusId,
+      classId: target.assignedClassId,
+      className: target.assignedClassName,
+      ageGroup: target.ageGroup,
+    }, 0);
+
+    setLessonPlans(prev => {
+      const map = new Map<string, LessonPlan>();
+      prev.forEach(p => map.set(p.id, p));
+      newPlans.forEach(p => map.set(p.id, p));
+      const updated = Array.from(map.values());
+      safeLocalStorageSet(STORAGE_KEYS.LESSON_PLANS, JSON.stringify(updated));
+      return updated;
+    });
+
+    newPlans.forEach(plan => {
+      try {
+        setDoc(doc(db, 'lessonPlans', plan.id), sanitizeForFirestore(plan), { merge: true }).catch(() => {});
+      } catch {}
+    });
+
+    broadcastLiveSync('FORCE_SYNC_TRIGGERED', { message: `Provisioned 14-week curriculum plans for ${target.name}` });
+    showToast(`Provisioned 14 weekly curriculum plans for ${target.name}!`, 'success');
+  }, [allAccounts]);
 
   const switchUser = (userId: string) => {
     const found = allAccounts.find(a => a.id === userId);
@@ -1308,6 +1183,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       avatar: userData.avatar || defaultAvatar,
       role,
       title: defaultTitle,
+      campusId: userData.campusId || 'DCH_SYW',
+      campusName: userData.campusName || CAMPUS_LIST.find(c => c.id === userData.campusId)?.shortName || 'DCH SYW',
+      registeredCampusIds: userData.registeredCampusIds || (userData.campusId ? [userData.campusId] : ['DCH_SYW']),
       assignedClassId: role === 'teacher' ? (userData.assignedClassId || 'cls_butterflies') : undefined,
       assignedClassName: role === 'teacher' ? (userData.assignedClassName || 'Pre-School') : undefined,
       ageGroup: role === 'teacher' ? (userData.ageGroup || 'Pre-School') : undefined,
@@ -1317,6 +1195,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: 'active',
       bio: userData.bio || `Authorized ${role.replace('_', ' ')} at Dewey Childcare House.`,
     };
+
+    // If registering a teacher, automatically provision their full set of weekly lesson plans
+    if (role === 'teacher') {
+      const generatedPlans = generateLessonPlansForTeacher({
+        id: newUser.id,
+        name: newUser.name,
+        avatar: newUser.avatar,
+        email: newUser.email,
+        campusId: newUser.campusId,
+        classId: newUser.assignedClassId,
+        className: newUser.assignedClassName,
+        ageGroup: newUser.ageGroup,
+      });
+
+      setLessonPlans(prev => {
+        const map = new Map<string, LessonPlan>();
+        prev.forEach(p => map.set(p.id, p));
+        generatedPlans.forEach(p => map.set(p.id, p));
+        const updated = Array.from(map.values());
+        safeLocalStorageSet(STORAGE_KEYS.LESSON_PLANS, JSON.stringify(updated));
+        return updated;
+      });
+
+      generatedPlans.forEach(plan => {
+        try {
+          setDoc(doc(db, 'lessonPlans', plan.id), sanitizeForFirestore(plan), { merge: true }).catch(() => {});
+        } catch {}
+      });
+    }
 
     // Save to Firestore users collection
     try {
@@ -1541,105 +1448,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast(`Account details for ${updatedAccount.name} updated successfully`, 'success');
   };
 
-  const deleteAccount = async (userId: string): Promise<boolean> => {
-    if (currentUser && (userId === currentUser.id || (currentUser.email && userId.toLowerCase() === currentUser.email.toLowerCase()))) {
+  const deleteAccount = (userId: string) => {
+    if (currentUser && userId === currentUser.id) {
       showToast('You cannot delete your own active session account.', 'warning');
-      return false;
+      return;
     }
-    const target = allAccounts.find(a => a.id === userId || (a.email && a.email.toLowerCase() === userId.toLowerCase()));
-    const targetId = target?.id || userId;
-    const targetEmail = (target?.email || '').toLowerCase().trim();
-    const targetName = target?.name || 'Staff Member';
-
-    // 1. Immediately register in permanent deletion registry (localStorage)
-    addDeletedUserId(targetId);
-    if (userId && userId !== targetId) addDeletedUserId(userId);
-    if (targetEmail) addDeletedUserId(targetEmail);
-    if (target?.firebaseUid) addDeletedUserId(target.firebaseUid);
-
-    // 2. Remove from active React state
+    const target = allAccounts.find(a => a.id === userId);
     let updatedList: UserAccount[] = [];
     setAllAccounts(prev => {
-      const next = prev.filter(a => {
-        const aId = a.id.toLowerCase();
-        const aEmail = (a.email || '').toLowerCase().trim();
-        return aId !== targetId.toLowerCase() &&
-               aId !== userId.toLowerCase() &&
-               (!targetEmail || aEmail !== targetEmail);
-      });
+      const next = prev.filter(a => a.id !== userId);
       updatedList = next;
       return next;
     });
-
-    // 3. Immediately persist updated accounts array to localStorage
-    safeLocalStorageSet(STORAGE_KEYS.ACCOUNTS, JSON.stringify(updatedList));
-
-    // 4. Update any classrooms where this teacher was the lead teacher
-    if (target?.role === 'teacher' || target?.assignedClassId) {
-      setClassrooms(prev => prev.map(c => {
-        if (c.leadTeacherId === targetId || c.leadTeacherName === targetName) {
-          const updatedCls = {
-            ...c,
-            leadTeacherId: '',
-            leadTeacherName: 'Unassigned',
-          };
-          try {
-            setDoc(doc(db, 'classrooms', c.id), sanitizeForFirestore(updatedCls), { merge: true }).catch(() => {});
-          } catch {}
-          return updatedCls;
-        }
-        return c;
-      }));
-    }
-
-    // 5. Permanent deletion from Cloud Firestore database
     try {
-      // Primary doc deletion by target ID & user ID
-      await deleteDoc(doc(db, 'users', targetId)).catch(() => {});
-      if (userId && userId !== targetId) {
-        await deleteDoc(doc(db, 'users', userId)).catch(() => {});
-      }
-      if (target?.firebaseUid) {
-        await deleteDoc(doc(db, 'users', target.firebaseUid)).catch(() => {});
-        await deleteDoc(doc(db, 'users', `fb_${target.firebaseUid}`)).catch(() => {});
-      }
-
-      // Query any duplicate/migrated docs by email and delete them
-      if (targetEmail) {
-        try {
-          const q = query(collection(db, 'users'), where('email', '==', target.email));
-          const snap = await getDocs(q);
-          for (const d of snap.docs) {
-            await deleteDoc(doc(db, 'users', d.id)).catch(() => {});
-          }
-        } catch {}
-      }
-
-      // 6. Record tombstone in deletedAccounts Firestore collection for cross-device sync
-      const tombstoneData = {
-        id: targetId,
-        email: targetEmail,
-        name: targetName,
-        deletedAt: new Date().toISOString(),
-        deletedBy: currentUser?.name || 'Administrator',
-      };
-      await setDoc(doc(db, 'deletedAccounts', targetId), tombstoneData, { merge: true }).catch(() => {});
-      if (targetEmail) {
-        const sanitizedKey = targetEmail.replace(/[^a-zA-Z0-9_-]/g, '_');
-        await setDoc(doc(db, 'deletedAccounts', sanitizedKey), tombstoneData, { merge: true }).catch(() => {});
-      }
-    } catch (e) {
-      console.warn('Firestore user deletion notice:', e);
+      deleteDoc(doc(db, 'users', userId)).catch(() => {});
+    } catch {}
+    if (updatedList.length > 0) {
+      broadcastLiveSync('ACCOUNTS_UPDATED', updatedList);
     }
-
-    // 7. Broadcast live sync to all browser windows & tabs
-    broadcastLiveSync('ACCOUNTS_UPDATED', updatedList);
-    broadcastLiveSync('ACCOUNT_DELETED', { userId: targetId, email: targetEmail });
-
-    // 8. Log system audit
-    addAuditLog('DELETE_USER', `Permanently deleted account ${targetName} (${targetEmail || targetId}) from database`, targetId);
-    showToast(`Account for ${targetName} has been permanently deleted from the database.`, 'info');
-    return true;
+    addAuditLog('DELETE_USER', `Deleted account of ${target?.name || userId}`, userId);
+    showToast(`Account for ${target?.name || 'user'} has been removed.`, 'info');
   };
 
   const registerTeacher = async (teacherData: Partial<UserAccount>): Promise<UserAccount | null> => {
@@ -1650,45 +1478,51 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Filtered lesson plans:
-  // - Admin / Super Admin: see all submissions across the institution
+  // - Admin / Super Admin: see all submissions across the institution (or filtered by selected campus)
   // - Regular accounts (teachers/staff): can strictly only see work belonging to their own account
   const userLessonPlans = useMemo(() => {
     if (!currentUser) return [];
-    let base = lessonPlans;
-    if (!isAdminOrSuperAdmin(currentUser)) {
-      const myId = currentUser.id;
-      const myEmail = (currentUser.email || '').toLowerCase().trim();
-      const myName = (currentUser.name || '').toLowerCase().trim();
-
-      base = lessonPlans.filter(p => {
-        const matchId = p.teacherId === myId;
-        const matchEmail = Boolean(p.teacherEmail && p.teacherEmail.toLowerCase().trim() === myEmail);
-        const matchName = Boolean(p.teacherName && p.teacherName.toLowerCase().trim() === myName);
-        return matchId || matchEmail || matchName;
-      });
+    if (isAdminOrSuperAdmin(currentUser)) {
+      if (selectedCampusId && selectedCampusId !== 'ALL') {
+        return lessonPlans.filter(p => isPlanFromCampus(p, selectedCampusId, classrooms, allAccounts));
+      }
+      return lessonPlans;
     }
 
+    // For faculty teacher accounts: Strictly return their own lesson plans
+    let myPlans = lessonPlans.filter(p => isLessonPlanForTeacher(p, currentUser));
+
+    // Fallback matching by assigned class if no plans matched yet
+    if (myPlans.length === 0 && currentUser.role === 'teacher') {
+      myPlans = lessonPlans.filter(p => 
+        (currentUser.assignedClassId && p.classId === currentUser.assignedClassId) ||
+        (p.teacherName && currentUser.name && p.teacherName.toLowerCase().includes(currentUser.name.toLowerCase()))
+      );
+    }
+
+    // If campus filter is explicitly applied and matches their plans, filter; otherwise never hide a teacher's own plans
     if (selectedCampusId && selectedCampusId !== 'ALL') {
-      base = base.filter(p => isPlanFromCampus(p, selectedCampusId, classrooms, allAccounts));
+      const campusFiltered = myPlans.filter(p => isPlanFromCampus(p, selectedCampusId, classrooms, allAccounts));
+      if (campusFiltered.length > 0) {
+        return campusFiltered;
+      }
     }
 
-    return base;
+    return myPlans;
   }, [currentUser, lessonPlans, selectedCampusId, classrooms, allAccounts]);
 
   // All plans belonging to the active user across all campuses
   const myTotalLessonPlans = useMemo(() => {
     if (!currentUser) return [];
     if (isAdminOrSuperAdmin(currentUser)) return lessonPlans;
-    const myId = currentUser.id;
-    const myEmail = (currentUser.email || '').toLowerCase().trim();
-    const myName = (currentUser.name || '').toLowerCase().trim();
-
-    return lessonPlans.filter(p => {
-      const matchId = p.teacherId === myId;
-      const matchEmail = Boolean(p.teacherEmail && p.teacherEmail.toLowerCase().trim() === myEmail);
-      const matchName = Boolean(p.teacherName && p.teacherName.toLowerCase().trim() === myName);
-      return matchId || matchEmail || matchName;
-    });
+    let myPlans = lessonPlans.filter(p => isLessonPlanForTeacher(p, currentUser));
+    if (myPlans.length === 0 && currentUser.role === 'teacher') {
+      myPlans = lessonPlans.filter(p => 
+        (currentUser.assignedClassId && p.classId === currentUser.assignedClassId) ||
+        (p.teacherName && currentUser.name && p.teacherName.toLowerCase().includes(currentUser.name.toLowerCase()))
+      );
+    }
+    return myPlans;
   }, [currentUser, lessonPlans]);
 
   // All teacher submissions across all Dewey campuses for curriculum archive & peer reference
@@ -1747,51 +1581,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     showToast('Lesson plan updated and synced', 'success');
   };
 
-  const deleteLessonPlan = async (id: string): Promise<boolean> => {
+  const deleteLessonPlan = (id: string) => {
     const target = lessonPlans.find(p => p.id === id);
-    const planTitle = target?.themeTitle || id;
-
-    // 1. Immediately register in permanent deletion registry
-    addDeletedPlanId(id);
-
-    // 2. Remove from active React state
-    let updatedList: LessonPlan[] = [];
-    setLessonPlans(prev => {
-      const next = prev.filter(p => p.id !== id);
-      updatedList = next;
-      return next;
-    });
-
+    setLessonPlans(prev => prev.filter(p => p.id !== id));
     if (selectedPlan?.id === id) {
       setSelectedPlan(null);
     }
-
-    // 3. Immediately persist updated plans array to localStorage
-    safeLocalStorageSet(STORAGE_KEYS.LESSON_PLANS, JSON.stringify(updatedList));
-
-    // 4. Delete document from Cloud Firestore database
     try {
-      await deleteDoc(doc(db, 'lessonPlans', id));
-
-      // 5. Record tombstone in deletedPlans collection for cross-device sync
-      const tombstoneData = {
-        id,
-        themeTitle: planTitle,
-        deletedAt: new Date().toISOString(),
-        deletedBy: currentUser?.name || 'Staff Member',
-      };
-      await setDoc(doc(db, 'deletedPlans', id), tombstoneData, { merge: true }).catch(() => {});
-    } catch (e: any) {
-      console.warn('Firestore lesson plan deletion notice:', e);
-    }
-
-    // 6. Broadcast live sync to all browser windows & tabs
+      deleteDoc(doc(db, 'lessonPlans', id)).catch(() => {});
+    } catch {}
     broadcastLiveSync('PLAN_DELETED', id);
-
-    // 7. Audit log & user toast
-    addAuditLog('DELETE_PLAN', `Permanently deleted lesson plan "${planTitle}" from database by ${currentUser?.name || 'Staff'}`, id);
-    showToast(`Lesson plan "${planTitle}" has been permanently deleted from the database.`, 'info');
-    return true;
+    addAuditLog('DELETE_PLAN', `Deleted lesson plan "${target?.themeTitle || id}" by ${currentUser?.name || 'Staff'}`, id);
+    showToast(`Lesson plan "${target?.themeTitle || 'item'}" removed.`, 'info');
   };
 
   const submitLessonPlan = (id: string) => {
@@ -2110,7 +1911,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return true;
     });
     return teachers.map(teacher => {
-      const plan = lessonPlans.find(p => p.teacherId === teacher.id && p.weekNumber === weekNumber);
+      const plan = lessonPlans.find(p => isLessonPlanForTeacher(p, teacher) && p.weekNumber === weekNumber);
       return {
         teacherId: teacher.id,
         teacherName: teacher.name,
@@ -2419,6 +2220,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         toggleGlobalSignUp,
         toggleCampusSignUp,
         isSignUpAllowedForCampus,
+        generatePlansForAccount,
       }}
     >
       {children}

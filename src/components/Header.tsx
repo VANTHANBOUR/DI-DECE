@@ -6,6 +6,7 @@ import { CampusTabsBar } from './CampusTabsBar';
 import { UserAvatar } from './UserAvatar';
 import { isCentralHQUser, isAdminOrSuperAdmin } from '../types';
 import { isPlanFromCampus } from '../utils/campusUtils';
+import { getTeacherLessonPlans } from '../utils/teacherUtils';
 import { 
   Users, 
   ShieldCheck, 
@@ -353,8 +354,8 @@ export const Header: React.FC<HeaderProps> = ({
                                 <span className="truncate">{account.title}</span>
                                 <span className="font-bold text-emerald-800 shrink-0 ml-1">
                                   {account.role === 'admin' || account.role === 'academic_officer'
-                                    ? `All 10 Plans`
-                                    : `${lessonPlans.filter(p => p.teacherId === account.id || (p.teacherEmail && p.teacherEmail.toLowerCase() === account.email.toLowerCase())).length} Submitted`}
+                                    ? `Central HQ`
+                                    : `${getTeacherLessonPlans(lessonPlans, account).length} Plans`}
                                 </span>
                               </div>
                             </div>

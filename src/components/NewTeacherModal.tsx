@@ -53,7 +53,7 @@ export const NewTeacherModal: React.FC<NewTeacherModalProps> = ({ onClose }) => 
       campusId,
       campusName: campusObj?.shortName || campusObj?.nameEnglish || 'DCH SYW',
       registeredCampusIds: [campusId],
-      email: email.trim() || `${name.toLowerCase().replace(/\s+/g, '.')}@deweychildcare.edu.kh`,
+      email: email.trim() || `${name.toLowerCase().replace(/\s+/g, '.')}@diu.edu.kh`,
       password: password.trim() || undefined,
       avatar: selectedAvatar,
       title: title.trim(),
@@ -160,7 +160,7 @@ export const NewTeacherModal: React.FC<NewTeacherModalProps> = ({ onClose }) => 
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="teacher.name@deweychildcare.edu.kh"
+                placeholder="teacher.name@diu.edu.kh"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-emerald-600"
               />
             </div>

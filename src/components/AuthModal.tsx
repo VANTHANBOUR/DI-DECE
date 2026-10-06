@@ -456,7 +456,7 @@ export const AuthModal: React.FC = () => {
                     required
                     value={signInEmail}
                     onChange={(e) => setSignInEmail(e.target.value)}
-                    placeholder="e.g. vanthanbour@diu.edu.kh or teacher.sreymom@deweychildcare.edu.kh"
+                    placeholder="e.g. vanthanbour@diu.edu.kh or teacher.name@diu.edu.kh"
                     className="w-full pl-10 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-emerald-600"
                   />
                 </div>
@@ -617,7 +617,7 @@ export const AuthModal: React.FC = () => {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@deweychildcare.edu.kh"
+                    placeholder="name@diu.edu.kh"
                     className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-emerald-600"
                   />
                 </div>

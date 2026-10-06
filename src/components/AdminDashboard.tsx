@@ -7,6 +7,7 @@ import { ClassroomsAndLevelsTab } from './ClassroomsAndLevelsTab';
 import { UserAvatar } from './UserAvatar';
 import { formatDateDDMMYYYY, formatDateRange, formatDateTimeDDMMYYYY } from '../utils/dateUtils';
 import { isPlanFromCampus } from '../utils/campusUtils';
+import { isLessonPlanForTeacher, getTeacherLessonPlans } from '../utils/teacherUtils';
 import { 
   ShieldCheck, 
   BookOpen, 
@@ -34,7 +35,8 @@ import {
   Plus,
   Building2,
   Table,
-  Printer
+  Printer,
+  MapPin
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -69,7 +71,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     deleteLevel,
     selectedCampusId,
     setSelectedCampusId,
-    formatAgeGroup
+    formatAgeGroup,
+    switchUser,
+    generatePlansForAccount
   } = useApp();
 
   // Filters
@@ -117,7 +121,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       if (!isPlanFromCampus(plan, selectedCampusFilter, classrooms, allAccounts)) return false;
     }
     if (selectedSubmissionWeek !== 'all' && plan.weekNumber !== parseInt(selectedSubmissionWeek, 10)) return false;
-    if (selectedTeacherId !== 'all' && plan.teacherId !== selectedTeacherId) return false;
+    if (selectedTeacherId !== 'all') {
+      const targetTeacher = allAccounts.find(a => a.id === selectedTeacherId);
+      if (targetTeacher) {
+        if (!isLessonPlanForTeacher(plan, targetTeacher)) return false;
+      } else if (plan.teacherId !== selectedTeacherId) {
+        return false;
+      }
+    }
     if (selectedAgeGroup !== 'all' && plan.ageGroup !== selectedAgeGroup) return false;
     if (selectedStatus !== 'all' && plan.status !== selectedStatus) return false;
     if (searchQuery.trim()) {
@@ -509,6 +520,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   <th className="py-3 px-4">Assigned Position</th>
                   <th className="py-3 px-4">Institutional Role (RBAC)</th>
                   <th className="py-3 px-4">Classroom Allocation</th>
+                  <th className="py-3 px-4">Lesson Plans</th>
                   <th className="py-3 px-4">Status</th>
                   <th className="py-3 px-4 text-right">Actions</th>
                 </tr>
@@ -522,6 +534,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                       return (
                         u.name.toLowerCase().includes(q) ||
                         u.email.toLowerCase().includes(q) ||
+                        (u.khmerName && u.khmerName.toLowerCase().includes(q)) ||
                         u.title.toLowerCase().includes(q) ||
                         (u.assignedClassName && u.assignedClassName.toLowerCase().includes(q))
                       );
@@ -573,6 +586,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <Edit3 className="w-3 h-3" />
                           </button>
                         </div>
+                        {user.roomNumber && (
+                          <div className="text-[10px] text-slate-500 mt-1 flex flex-wrap items-center gap-1">
+                            <span className="flex items-center gap-0.5 text-slate-600 font-semibold">
+                              <MapPin className="w-3 h-3 text-rose-500 shrink-0" />
+                              {user.roomNumber}
+                            </span>
+                            {(() => {
+                              const officeMate = allAccounts.find(a => a.id !== user.id && a.campusId === user.campusId && a.roomNumber === user.roomNumber);
+                              if (officeMate) {
+                                return (
+                                  <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.2 rounded-md">
+                                    Office mate: {officeMate.name}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        )}
                       </td>
 
                       {/* Role Selector */}
@@ -621,6 +653,45 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         )}
                       </td>
 
+                      {/* Lesson Plans */}
+                      <td className="py-3.5 px-4">
+                        {(() => {
+                          const teacherPlans = getTeacherLessonPlans(lessonPlans, user);
+                          return (
+                            <div className="flex flex-col gap-1">
+                              <button
+                                onClick={() => {
+                                  setSelectedTeacherId(user.id);
+                                  setSelectedCampusFilter('all');
+                                  setActiveAdminSubTab('submissions');
+                                }}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 rounded-xl text-xs font-bold transition-all text-left shadow-2xs group cursor-pointer"
+                                title={`Click to view all ${teacherPlans.length} lesson plans for ${user.name}`}
+                              >
+                                <BookOpen className="w-3.5 h-3.5 text-blue-600 group-hover:scale-110 transition-transform shrink-0" />
+                                <span>{teacherPlans.length} Plans</span>
+                                <span className="text-[10px] text-blue-600 underline ml-0.5">View</span>
+                              </button>
+                              {teacherPlans.length > 0 ? (
+                                <span className="text-[10px] text-slate-400 pl-0.5">
+                                  {teacherPlans.filter(p => p.status === 'approved').length} approved · {teacherPlans.filter(p => p.status === 'submitted' || p.status === 'under_review').length} review
+                                </span>
+                              ) : user.role === 'teacher' ? (
+                                <button
+                                  type="button"
+                                  onClick={() => generatePlansForAccount(user.id)}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-lg text-[10px] font-bold transition-colors cursor-pointer"
+                                  title={`Generate full 14-week curriculum plans for ${user.name}`}
+                                >
+                                  <Sparkles className="w-3 h-3 text-amber-600" />
+                                  <span>Generate Plans</span>
+                                </button>
+                              ) : null}
+                            </div>
+                          );
+                        })()}
+                      </td>
+
                       {/* Status */}
                       <td className="py-3.5 px-4">
                         <button
@@ -646,6 +717,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                             <Edit3 className="w-3.5 h-3.5 text-emerald-700" />
                             <span>Manage</span>
                           </button>
+
+                          {user.id !== currentUser?.id && (
+                            <button
+                              onClick={() => switchUser(user.id)}
+                              className="px-2.5 py-1 text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-xl text-xs font-bold transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                              title={`Log in as ${user.name} to view their account dashboard & lesson plans`}
+                            >
+                              <Users className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Switch</span>
+                            </button>
+                          )}
 
                           <button
                             onClick={() => setUserToDelete(user)}

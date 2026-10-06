@@ -498,7 +498,7 @@ export const AuthGate: React.FC = () => {
                     <span className="text-[10px] text-emerald-700 font-semibold">Select to test</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {/* Academic Officer Profile (Primary Reviewer) */}
                     {allAccounts.filter(a => a.role === 'academic_officer').slice(0, 1).map(acc => (
                       <button
@@ -506,13 +506,13 @@ export const AuthGate: React.FC = () => {
                         type="button"
                         onClick={() => handleQuickDemoLogin(acc)}
                         disabled={isLoading}
-                        className="flex items-center gap-2 p-2 rounded-xl bg-blue-50/80 border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-100/70 transition-all text-left shadow-xs group"
+                        className="flex items-center gap-2 p-2.5 rounded-xl bg-blue-50/80 border-2 border-blue-400 hover:border-blue-600 hover:bg-blue-100/70 transition-all text-left shadow-xs group"
                       >
-                        <UserAvatar src={acc.avatar} name={acc.name} className="w-8 h-8 rounded-lg ring-2 ring-blue-500 shrink-0" />
+                        <UserAvatar src={acc.avatar} name={acc.name} className="w-9 h-9 rounded-lg ring-2 ring-blue-500 shrink-0" />
                         <div className="min-w-0">
-                          <p className="text-[11px] font-black text-slate-900 truncate">{acc.name}</p>
-                          <span className="text-[8px] font-black uppercase px-1.5 py-0.2 bg-blue-600 text-white rounded inline-block">
-                            🎓 Academic Officer (All 10 Plans)
+                          <p className="text-xs font-black text-slate-900 truncate">{acc.name}</p>
+                          <span className="text-[9px] font-black uppercase px-1.5 py-0.5 bg-blue-600 text-white rounded inline-block mt-0.5">
+                            🎓 Academic Officer & Central HQ
                           </span>
                         </div>
                       </button>
@@ -525,36 +525,17 @@ export const AuthGate: React.FC = () => {
                         type="button"
                         onClick={() => handleQuickDemoLogin(acc)}
                         disabled={isLoading}
-                        className="flex items-center gap-2 p-2 rounded-xl bg-white border border-amber-300 hover:border-amber-500 hover:bg-amber-50/60 transition-all text-left shadow-2xs group"
+                        className="flex items-center gap-2 p-2.5 rounded-xl bg-white border border-amber-300 hover:border-amber-500 hover:bg-amber-50/60 transition-all text-left shadow-2xs group"
                       >
-                        <UserAvatar src={acc.avatar} name={acc.name} className="w-8 h-8 rounded-lg ring-1 ring-amber-400 shrink-0" />
+                        <UserAvatar src={acc.avatar} name={acc.name} className="w-9 h-9 rounded-lg ring-1 ring-amber-400 shrink-0" />
                         <div className="min-w-0">
-                          <p className="text-[11px] font-bold text-slate-900 truncate">{acc.name}</p>
-                          <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.2 bg-amber-100 text-amber-900 rounded inline-block">
-                            👑 Principal (All 10 Plans)
+                          <p className="text-xs font-bold text-slate-900 truncate">{acc.name}</p>
+                          <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 bg-amber-100 text-amber-900 rounded inline-block mt-0.5">
+                            👑 Institutional Admin
                           </span>
                         </div>
                       </button>
                     ))}
-
-                    {/* Lead Teacher Profile */}
-                    {demoTeacher && (
-                      <button
-                        key={demoTeacher.id}
-                        type="button"
-                        onClick={() => handleQuickDemoLogin(demoTeacher)}
-                        disabled={isLoading}
-                        className="flex items-center gap-2 p-2 rounded-xl bg-white border border-emerald-300 hover:border-emerald-500 hover:bg-emerald-50/60 transition-all text-left shadow-2xs group"
-                      >
-                        <UserAvatar src={demoTeacher.avatar} name={demoTeacher.name} className="w-8 h-8 rounded-lg ring-1 ring-emerald-400 shrink-0" />
-                        <div className="min-w-0">
-                          <p className="text-[11px] font-bold text-slate-900 truncate">{demoTeacher.name}</p>
-                          <span className="text-[8px] font-extrabold uppercase px-1.5 py-0.2 bg-emerald-100 text-emerald-900 rounded inline-block">
-                            👩‍🏫 Lead Teacher ({demoTeacher.campusName || activeCampus.shortName})
-                          </span>
-                        </div>
-                      </button>
-                    )}
                   </div>
                 </div>
 
