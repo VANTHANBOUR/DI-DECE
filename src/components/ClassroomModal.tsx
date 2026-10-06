@@ -39,15 +39,6 @@ const COLOR_PRESETS = [
   { name: 'Sky Cyan', hex: '#0284C7' },
 ];
 
-const NAME_PRESETS = [
-  { name: 'Butterflies', khmer: 'ថ្នាក់មេអំបៅ', ageGroup: 'Pre-School' as EarlyChildhoodAgeGroup, code: 'PRE-K A', color: '#007A43' },
-  { name: 'Ladybugs', khmer: 'ថ្នាក់កូនសត្វល្អិត', ageGroup: 'Pre-Nursery' as EarlyChildhoodAgeGroup, code: 'PNUR-A', color: '#E11D48' },
-  { name: 'Sunflowers', khmer: 'ថ្នាក់ផ្កាឈូករ័ត្ន', ageGroup: 'Kindergarten' as EarlyChildhoodAgeGroup, code: 'K1-A', color: '#D97706' },
-  { name: 'Honey Bees', khmer: 'ថ្នាក់កូនឃ្មុំឧស្សាហ៍', ageGroup: 'Nursery' as EarlyChildhoodAgeGroup, code: 'NUR-A', color: '#0D9488' },
-  { name: 'Little Pandas', khmer: 'ថ្នាក់ខ្លាឃ្មុំផេនដា', ageGroup: 'Kindergarten' as EarlyChildhoodAgeGroup, code: 'K2-A', color: '#7C3AED' },
-  { name: 'Sea Turtles', khmer: 'ថ្នាក់អណ្ដើកសមុទ្រ', ageGroup: 'Kindergarten' as EarlyChildhoodAgeGroup, code: 'K1-B', color: '#0284C7' },
-];
-
 export const ClassroomModal: React.FC<ClassroomModalProps> = ({ classroomToEdit, onClose }) => {
   const { 
     allAccounts, 
@@ -238,14 +229,6 @@ export const ClassroomModal: React.FC<ClassroomModalProps> = ({ classroomToEdit,
     setIsTeacherFormOpen(false);
   };
 
-  const handleApplyPreset = (preset: typeof NAME_PRESETS[0]) => {
-    setName(preset.name);
-    setKhmerName(preset.khmer);
-    setAgeGroup(preset.ageGroup);
-    setCode(preset.code);
-    setColorTheme(preset.color);
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -376,33 +359,6 @@ export const ClassroomModal: React.FC<ClassroomModalProps> = ({ classroomToEdit,
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5 max-h-[75vh] overflow-y-auto">
           
-          {/* Quick Preset Badges (for new classroom) */}
-          {!isEditing && (
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                  <span>Quick Presets:</span>
-                </span>
-                <span className="text-[10px] text-slate-400">Click to apply preset details</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {NAME_PRESETS.map((p) => (
-                  <button
-                    key={p.name}
-                    type="button"
-                    onClick={() => handleApplyPreset(p)}
-                    className="px-2.5 py-1 bg-white hover:bg-emerald-50 hover:border-emerald-300 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 transition-all flex items-center gap-1.5 shadow-2xs"
-                  >
-                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: p.color }} />
-                    <span>{p.name}</span>
-                    <span className="text-[10px] text-slate-400 font-normal font-['Battambang']">({p.khmer})</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* 1. CLASSROOM NAME & IDENTIFIERS */}
           <div className="space-y-3">
             <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center justify-between">
