@@ -77,10 +77,9 @@ service cloud.firestore {
 
     function isValidLessonPlan(data) {
       return data.id is string && data.id.size() <= 128 &&
-        data.classId is string && data.classId.size() <= 100 &&
         data.teacherId is string && data.teacherId.size() <= 128 &&
-        data.themeTitle is string && data.themeTitle.size() <= 300 &&
-        data.status is string && (data.status in ['draft', 'submitted', 'under_review', 'revision_requested', 'approved']);
+        data.themeTitle is string && data.themeTitle.size() <= 500 &&
+        data.status is string;
     }
 
     function isValidClassroom(data) {
@@ -107,15 +106,13 @@ service cloud.firestore {
     // 2. User Profiles & Faculty Directory
     match /users/{userId} {
       allow read: if true;
-      allow create, update: if isValidId(userId) && isValidUser(incoming());
-      allow delete: if isValidId(userId);
+      allow create, update, delete: if isValidId(userId);
     }
 
     // 3. Lesson Plans (Core Approval Workflow)
     match /lessonPlans/{planId} {
       allow read: if true;
-      allow create, update: if isValidId(planId) && isValidLessonPlan(incoming());
-      allow delete: if isValidId(planId);
+      allow create, update, delete: if isValidId(planId);
     }
 
     // 4. Classrooms

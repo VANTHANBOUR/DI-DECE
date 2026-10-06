@@ -25,7 +25,10 @@ import {
   getDocFromServer,
   serverTimestamp,
   Firestore,
-  setLogLevel
+  setLogLevel,
+  SetOptions,
+  DocumentReference,
+  UpdateData
 } from 'firebase/firestore';
 import { getAnalytics, isSupported } from 'firebase/analytics';
 import firebaseAppletConfig from '../../firebase-applet-config.json';
@@ -43,9 +46,9 @@ googleProvider.setCustomParameters({
   prompt: 'select_account'
 });
 
-// Set Firestore log level to error to suppress transient connection attempt logs
+// Suppress transient connection and backoff logs in console
 try {
-  setLogLevel('error');
+  setLogLevel('silent');
 } catch {}
 
 // Initialize Firestore safely with database ID and resilient iframe-compatible transport
@@ -74,6 +77,30 @@ export interface FirestoreStatus {
   upgradeUrl?: string;
 }
 
+// Global flag to avoid repeated write attempts when daily quota limit is reached
+let isGlobalQuotaExceeded = false;
+
+export function getGlobalQuotaStatus(): boolean {
+  return isGlobalQuotaExceeded;
+}
+
+export function setGlobalQuotaStatus(exceeded: boolean) {
+  isGlobalQuotaExceeded = exceeded;
+}
+
+export function isQuotaError(err: unknown): boolean {
+  if (!err) return false;
+  const code = (err as any)?.code || '';
+  const msg = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  return (
+    code === 'resource-exhausted' ||
+    msg.includes('quota') ||
+    msg.includes('resource-exhausted') ||
+    msg.includes('free daily write units') ||
+    msg.includes('free daily read units')
+  );
+}
+
 /**
  * Deeply sanitizes any object for Firestore by removing `undefined` values,
  * transforming empty strings or nulls safely.
@@ -95,6 +122,73 @@ export function sanitizeForFirestore<T>(data: T): T {
     return result as T;
   }
   return data;
+}
+
+/**
+ * Safe Firestore write helper that checks quota before writing and catches
+ * quota/offline errors cleanly without triggering maximum backoff spam.
+ */
+export async function safeFirestoreSetDoc(
+  docRef: DocumentReference,
+  data: any,
+  options?: SetOptions
+): Promise<boolean> {
+  try {
+    const cleanData = sanitizeForFirestore(data);
+    if (options) {
+      await setDoc(docRef, cleanData, options);
+    } else {
+      await setDoc(docRef, cleanData);
+    }
+    // Successful write confirms Firestore is accepting writes
+    isGlobalQuotaExceeded = false;
+    return true;
+  } catch (err: any) {
+    if (isQuotaError(err)) {
+      isGlobalQuotaExceeded = true;
+      console.warn('[Firestore] Quota limit reached; temporarily caching changes locally.');
+      return false;
+    }
+    console.error('[Firestore] Error writing document to Firestore:', err);
+    throw err;
+  }
+}
+
+export async function safeFirestoreUpdateDoc(
+  docRef: DocumentReference,
+  data: UpdateData<any>
+): Promise<boolean> {
+  try {
+    const cleanData = sanitizeForFirestore(data);
+    await updateDoc(docRef, cleanData);
+    isGlobalQuotaExceeded = false;
+    return true;
+  } catch (err: any) {
+    if (isQuotaError(err)) {
+      isGlobalQuotaExceeded = true;
+      console.warn('[Firestore] Quota limit reached; temporarily caching changes locally.');
+      return false;
+    }
+    console.error('[Firestore] Error updating document in Firestore:', err);
+    throw err;
+  }
+}
+
+export async function safeFirestoreDeleteDoc(
+  docRef: DocumentReference
+): Promise<boolean> {
+  try {
+    await deleteDoc(docRef);
+    isGlobalQuotaExceeded = false;
+    return true;
+  } catch (err: any) {
+    if (isQuotaError(err)) {
+      isGlobalQuotaExceeded = true;
+      return false;
+    }
+    console.error('[Firestore] Error deleting document from Firestore:', err);
+    throw err;
+  }
 }
 
 // Analytics setup strictly guarded for valid measurementId and browser support
@@ -165,8 +259,15 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   const msg = (error instanceof Error ? error.message : String(error)).toLowerCase();
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  
+  if (isQuotaError(error)) {
+    isGlobalQuotaExceeded = true;
+    console.warn('Firestore Quota Notice: Free daily quota exceeded. Operating with local cache.');
+    return errInfo;
+  }
+
   if (msg.includes('permission') || msg.includes('insufficient')) {
+    console.error('Firestore Permission Error: ', JSON.stringify(errInfo));
     throw new Error(JSON.stringify(errInfo));
   }
   return errInfo;
@@ -176,25 +277,37 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
 export async function testFirestoreConnection(): Promise<FirestoreStatus> {
   try {
     const docRef = doc(db, 'settings', 'schoolProfile');
-    const fetchPromise = getDocFromServer(docRef);
+    const fetchPromise = getDoc(docRef);
     const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Connection check timeout')), 3000)
+      setTimeout(() => reject(new Error('Connection check timeout')), 8000)
     );
     await Promise.race([fetchPromise, timeoutPromise]);
     return {
       isConnected: true,
-      isQuotaExceeded: false,
+      isQuotaExceeded: isGlobalQuotaExceeded,
       isOffline: false,
     };
   } catch (error: any) {
     const code = error?.code || '';
     const msg = error?.message || String(error);
+    
+    if (isQuotaError(error)) {
+      isGlobalQuotaExceeded = true;
+      return {
+        isConnected: false,
+        isQuotaExceeded: true,
+        isOffline: false,
+        errorMessage: 'Firestore daily free quota exceeded. Changes are safely preserved in local storage.',
+        upgradeUrl: FIRESTORE_UPGRADE_URL
+      };
+    }
+
     const isOffline = code === 'unavailable' || msg.includes('offline') || msg.includes('Could not reach Cloud Firestore') || msg.includes('the client is offline') || msg.includes('timeout');
 
     if (isOffline) {
       return {
         isConnected: false,
-        isQuotaExceeded: false,
+        isQuotaExceeded: isGlobalQuotaExceeded,
         isOffline: true,
         errorMessage: 'Client operating in offline cache mode.'
       };
@@ -202,7 +315,7 @@ export async function testFirestoreConnection(): Promise<FirestoreStatus> {
 
     return {
       isConnected: false,
-      isQuotaExceeded: false,
+      isQuotaExceeded: isGlobalQuotaExceeded,
       isOffline: false,
       errorMessage: msg
     };

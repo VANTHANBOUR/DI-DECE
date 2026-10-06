@@ -13,6 +13,10 @@ import {
   testFirestoreConnection,
   firebaseConfig,
   sanitizeForFirestore,
+  safeFirestoreSetDoc,
+  safeFirestoreUpdateDoc,
+  safeFirestoreDeleteDoc,
+  isQuotaError,
   FIRESTORE_UPGRADE_URL,
   FIREBASE_AUTH_SETTINGS_URL
 } from '../lib/firebase';
@@ -77,6 +81,9 @@ interface AppContextType {
   lastSyncedAt: string | null;
   pushLiveUpdate: (customMessage?: string) => Promise<void>;
   forceCloudSync: () => Promise<void>;
+  retrieveFirebaseAccounts: () => Promise<UserAccount[]>;
+  retrieveFirebaseLessonPlans: () => Promise<LessonPlan[]>;
+  syncLocalLessonPlansToFirestore: (plansToSync?: LessonPlan[]) => Promise<number>;
   
   // Auth Modal Controls
   isAuthModalOpen: boolean;
@@ -537,20 +544,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4500);
   };
 
-  // Test Firebase Firestore Connection on Mount & listen to Auth
+  // Test Firebase Firestore Connection on Mount, retrieve registered accounts & listen to Auth
   useEffect(() => {
+    // 1. Immediately initiate cloud retrieval of registered accounts and lesson plans
+    retrieveFirebaseAccounts().catch(() => {});
+    retrieveFirebaseLessonPlans().catch(() => {});
+
     testFirestoreConnection().then(status => {
       setIsFirebaseConnected(status.isConnected);
-      setIsQuotaExceeded(false);
+      setIsQuotaExceeded(status.isQuotaExceeded);
       setIsOfflineMode(status.isOffline);
-      if (status.errorMessage && !status.errorMessage.toLowerCase().includes('quota')) {
+      if (status.isQuotaExceeded) {
+        setFirestoreStatusMessage(status.errorMessage || 'Firestore daily write quota reached for free tier. Local cache active.');
+      } else if (status.errorMessage) {
         setFirestoreStatusMessage(status.errorMessage);
+      }
+      if (status.isConnected) {
+        retrieveFirebaseAccounts().catch(() => {});
+        retrieveFirebaseLessonPlans().catch(() => {});
       }
     });
 
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
       setFirebaseAuthUser(fbUser);
       if (fbUser && fbUser.email) {
+        // Refresh plans when user authenticates
+        retrieveFirebaseLessonPlans().catch(() => {});
         const email = fbUser.email.toLowerCase();
         setAllAccounts(prev => {
           const match = prev.find(a => (a.email && a.email.toLowerCase() === email) || (a.firebaseUid && a.firebaseUid === fbUser.uid));
@@ -567,7 +586,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             safeLocalStorageSet(STORAGE_KEYS.IS_LOGGED_IN, 'true');
             safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER_ID, updated.id);
 
-            setDoc(doc(db, 'users', updated.id), sanitizeForFirestore(updated), { merge: true }).catch(() => {});
+            safeFirestoreSetDoc(doc(db, 'users', updated.id), updated, { merge: true }).catch(() => {});
 
             return prev.map(a => a.id === updated.id ? updated : a);
           } else {
@@ -605,7 +624,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             safeLocalStorageSet(STORAGE_KEYS.IS_LOGGED_IN, 'true');
             safeLocalStorageSet(STORAGE_KEYS.CURRENT_USER_ID, newAccount.id);
 
-            setDoc(doc(db, 'users', newAccount.id), sanitizeForFirestore(newAccount), { merge: true }).catch(() => {});
+            safeFirestoreSetDoc(doc(db, 'users', newAccount.id), newAccount, { merge: true }).catch(() => {});
 
             return [...prev.filter(a => a.email.toLowerCase() !== email), newAccount];
           }
@@ -951,7 +970,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAuditLogs(prev => [newLog, ...prev]);
 
     try {
-      setDoc(doc(db, 'auditLogs', newLog.id), newLog).catch(() => {});
+      safeFirestoreSetDoc(doc(db, 'auditLogs', newLog.id), newLog).catch(() => {});
     } catch {
       // Offline fallback
     }
@@ -1151,7 +1170,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         status: newUser.status,
         createdAt: new Date().toISOString()
       });
-      await setDoc(doc(db, 'users', newUser.id), cleanRecord, { merge: true });
+      await safeFirestoreSetDoc(doc(db, 'users', newUser.id), cleanRecord, { merge: true });
     } catch (err) {
       handleFirestoreError(err, OperationType.CREATE, 'users');
     }
@@ -1205,7 +1224,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
 
         try {
-          await setDoc(doc(db, 'users', existing.id), sanitizeForFirestore(existing), { merge: true });
+          await safeFirestoreSetDoc(doc(db, 'users', existing.id), existing, { merge: true });
         } catch {}
 
         setAllAccounts(prev => [...prev, existing!]);
@@ -1219,7 +1238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         existing = updatedUser;
         setAllAccounts(prev => prev.map(a => a.id === updatedUser.id ? updatedUser : a));
         try {
-          await setDoc(doc(db, 'users', updatedUser.id), sanitizeForFirestore(updatedUser), { merge: true });
+          await safeFirestoreSetDoc(doc(db, 'users', updatedUser.id), updatedUser, { merge: true });
         } catch {}
       }
 
@@ -1307,10 +1326,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      const cleanUser = sanitizeForFirestore(updatedAccount);
-      setDoc(doc(db, 'users', userId), cleanUser, { merge: true }).catch((err) => {
-        handleFirestoreError(err, OperationType.UPDATE, `users/${userId}`);
-      });
+      safeFirestoreSetDoc(doc(db, 'users', userId), updatedAccount, { merge: true }).catch(() => {});
     } catch (e) {
       console.warn('Firestore user update notice:', e);
     }
@@ -1336,7 +1352,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (updates.name) planUpdates.teacherName = updates.name;
             const updatedPlan = { ...plan, ...planUpdates };
             try {
-              setDoc(doc(db, 'lessonPlans', plan.id), sanitizeForFirestore(updatedPlan), { merge: true }).catch(() => {});
+              safeFirestoreSetDoc(doc(db, 'lessonPlans', plan.id), updatedPlan, { merge: true }).catch(() => {});
             } catch {}
             return updatedPlan;
           }
@@ -1363,7 +1379,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return next;
     });
     try {
-      deleteDoc(doc(db, 'users', userId)).catch(() => {});
+      safeFirestoreDeleteDoc(doc(db, 'users', userId)).catch(() => {});
     } catch {}
     if (updatedList.length > 0) {
       broadcastLiveSync('ACCOUNTS_UPDATED', updatedList);
@@ -1444,16 +1460,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setLessonPlans(prev => [newPlan, ...prev]);
 
-    try {
-      const cleanPlan = sanitizeForFirestore(newPlan);
-      setDoc(doc(db, 'lessonPlans', newPlan.id), cleanPlan, { merge: true }).catch((err) => {
-        handleFirestoreError(err, OperationType.CREATE, 'lessonPlans');
+    // Store directly in Firebase Firestore collection
+    safeFirestoreSetDoc(doc(db, 'lessonPlans', newPlan.id), newPlan, { merge: true })
+      .then((stored) => {
+        if (stored) {
+          showToast(`Lesson Plan stored in Firebase Firestore!`, 'success');
+        }
+      })
+      .catch((err) => {
+        console.warn('Firestore save warning:', err);
+        showToast(`Stored locally; cloud notice: ${err?.message || 'operating with local cache'}`, 'info');
       });
-    } catch {}
 
     broadcastLiveSync('PLAN_UPDATED', newPlan);
     addAuditLog('CREATE_PLAN', `Created new lesson plan "${newPlan.themeTitle}" for Week ${newPlan.weekNumber}`, newPlan.id);
-    showToast(`Lesson Plan for Week ${newPlan.weekNumber} saved & synced to Firebase!`, 'success');
     return newPlan;
   };
 
@@ -1473,14 +1493,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedPlan(updatedPlan);
     }
 
-    try {
-      const cleanPlan = sanitizeForFirestore(updatedPlan);
-      setDoc(doc(db, 'lessonPlans', id), cleanPlan, { merge: true }).catch(() => {});
-    } catch {}
+    // Store directly in Firebase Firestore collection
+    safeFirestoreSetDoc(doc(db, 'lessonPlans', id), updatedPlan, { merge: true })
+      .then((stored) => {
+        if (stored) {
+          showToast(`Lesson plan updated in Firebase Firestore!`, 'success');
+        }
+      })
+      .catch((err) => {
+        console.warn('Firestore update warning:', err);
+      });
 
     broadcastLiveSync('PLAN_UPDATED', updatedPlan);
     addAuditLog('UPDATE_PLAN', `Updated details for lesson plan ID ${id}`, id);
-    showToast('Lesson plan updated and synced', 'success');
   };
 
   const deleteLessonPlan = (id: string) => {
@@ -1490,7 +1515,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setSelectedPlan(null);
     }
     try {
-      deleteDoc(doc(db, 'lessonPlans', id)).catch(() => {});
+      safeFirestoreDeleteDoc(doc(db, 'lessonPlans', id)).catch(() => {});
     } catch {}
     broadcastLiveSync('PLAN_DELETED', id);
     addAuditLog('DELETE_PLAN', `Deleted lesson plan "${target?.themeTitle || id}" by ${currentUser?.name || 'Staff'}`, id);
@@ -1549,8 +1574,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      const cleanPlan = sanitizeForFirestore(updatedPlan);
-      setDoc(doc(db, 'lessonPlans', planId), cleanPlan, { merge: true }).catch(() => {});
+      safeFirestoreSetDoc(doc(db, 'lessonPlans', planId), updatedPlan, { merge: true }).catch(() => {});
     } catch {}
 
     broadcastLiveSync('PLAN_APPROVED', updatedPlan);
@@ -1592,8 +1616,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           };
           approvedPlans.push(updated);
           try {
-            const cleanPlan = sanitizeForFirestore(updated);
-            setDoc(doc(db, 'lessonPlans', p.id), cleanPlan, { merge: true }).catch(() => {});
+            safeFirestoreSetDoc(doc(db, 'lessonPlans', p.id), updated, { merge: true }).catch(() => {});
           } catch {}
           return updated;
         }
@@ -1628,8 +1651,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ageGroup: newClassroom.ageGroup
           };
           try {
-            const cleanUser = sanitizeForFirestore(updated);
-            setDoc(doc(db, 'users', acc.id), cleanUser, { merge: true }).catch(() => {});
+            safeFirestoreSetDoc(doc(db, 'users', acc.id), updated, { merge: true }).catch(() => {});
           } catch {}
           return updated;
         }
@@ -1638,8 +1660,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
-      const cleanClass = sanitizeForFirestore(newClassroom);
-      setDoc(doc(db, 'classrooms', newClassroom.id), cleanClass, { merge: true }).catch(() => {});
+      safeFirestoreSetDoc(doc(db, 'classrooms', newClassroom.id), newClassroom, { merge: true }).catch(() => {});
     } catch {}
 
     broadcastLiveSync('CLASSROOM_ADDED', newClassroom);
@@ -1662,10 +1683,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 2. Persist to Firestore directly
     try {
-      const cleanClass = sanitizeForFirestore(updatedClassroom);
-      setDoc(doc(db, 'classrooms', id), cleanClass, { merge: true }).catch((err) => {
-        handleFirestoreError(err, OperationType.UPDATE, `classrooms/${id}`);
-      });
+      safeFirestoreSetDoc(doc(db, 'classrooms', id), updatedClassroom, { merge: true }).catch(() => {});
     } catch (e) {
       console.warn('Firestore classroom update notice:', e);
     }
@@ -1682,8 +1700,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ageGroup: updates.ageGroup || acc.ageGroup
           };
           try {
-            const cleanUser = sanitizeForFirestore(updatedUser);
-            setDoc(doc(db, 'users', acc.id), cleanUser, { merge: true }).catch(() => {});
+            safeFirestoreSetDoc(doc(db, 'users', acc.id), updatedUser, { merge: true }).catch(() => {});
           } catch {}
           return updatedUser;
         }
@@ -1695,8 +1712,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             ageGroup: updates.ageGroup || acc.ageGroup
           };
           try {
-            const cleanUser = sanitizeForFirestore(updatedUser);
-            setDoc(doc(db, 'users', acc.id), cleanUser, { merge: true }).catch(() => {});
+            safeFirestoreSetDoc(doc(db, 'users', acc.id), updatedUser, { merge: true }).catch(() => {});
           } catch {}
           return updatedUser;
         }
@@ -1726,7 +1742,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           assignedClassName: 'Unassigned'
         };
         try {
-          updateDoc(doc(db, 'users', acc.id), {
+          safeFirestoreUpdateDoc(doc(db, 'users', acc.id), {
             assignedClassId: null,
             assignedClassName: 'Unassigned'
           }).catch(() => {});
@@ -1737,7 +1753,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     try {
-      deleteDoc(doc(db, 'classrooms', id)).catch(() => {});
+      safeFirestoreDeleteDoc(doc(db, 'classrooms', id)).catch(() => {});
     } catch {}
 
     broadcastLiveSync('CLASSROOM_DELETED', id);
@@ -1754,8 +1770,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLevels(prev => [...prev, newLevel]);
 
     try {
-      const cleanLevel = sanitizeForFirestore(newLevel);
-      setDoc(doc(db, 'levels', newLevel.id), cleanLevel, { merge: true }).catch(() => {});
+      safeFirestoreSetDoc(doc(db, 'levels', newLevel.id), newLevel, { merge: true }).catch(() => {});
     } catch {}
 
     broadcastLiveSync('LEVEL_ADDED', newLevel);
@@ -1776,10 +1791,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLevels(prev => prev.map(l => l.id === id ? updatedLevel : l));
 
     try {
-      const cleanLevel = sanitizeForFirestore(updatedLevel);
-      setDoc(doc(db, 'levels', id), cleanLevel, { merge: true }).catch((err) => {
-        handleFirestoreError(err, OperationType.UPDATE, `levels/${id}`);
-      });
+      safeFirestoreSetDoc(doc(db, 'levels', id), updatedLevel, { merge: true }).catch(() => {});
     } catch (e) {
       console.warn('Firestore level update notice:', e);
     }
@@ -1796,7 +1808,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setLevels(prev => prev.filter(l => l.id !== id));
 
     try {
-      deleteDoc(doc(db, 'levels', id)).catch(() => {});
+      safeFirestoreDeleteDoc(doc(db, 'levels', id)).catch(() => {});
     } catch {}
 
     broadcastLiveSync('LEVEL_DELETED', id);
@@ -1837,26 +1849,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updatedAt: now,
         updatedBy: currentUser ? `${currentUser.name} (${currentUser.role})` : 'Authorized Staff'
       });
-      await setDoc(doc(db, 'settings', 'schoolProfile'), cleanProfile, { merge: true }).catch((err) => {
-        console.warn('Firestore settings update notice:', err);
-      });
+      await safeFirestoreSetDoc(doc(db, 'settings', 'schoolProfile'), cleanProfile, { merge: true });
 
       // 2. Sanitize & write all Lesson Plans to Firestore
       for (const plan of lessonPlans) {
-        const cleanPlan = sanitizeForFirestore(plan);
-        await setDoc(doc(db, 'lessonPlans', plan.id), cleanPlan, { merge: true }).catch(() => {});
+        await safeFirestoreSetDoc(doc(db, 'lessonPlans', plan.id), plan, { merge: true });
       }
 
       // 3. Sanitize & write all Classrooms to Firestore
       for (const c of classrooms) {
-        const cleanClass = sanitizeForFirestore(c);
-        await setDoc(doc(db, 'classrooms', c.id), cleanClass, { merge: true }).catch(() => {});
+        await safeFirestoreSetDoc(doc(db, 'classrooms', c.id), c, { merge: true });
       }
 
       // 4. Sanitize & write all User accounts
       for (const u of allAccounts) {
-        const cleanUser = sanitizeForFirestore(u);
-        await setDoc(doc(db, 'users', u.id), cleanUser, { merge: true }).catch(() => {});
+        await safeFirestoreSetDoc(doc(db, 'users', u.id), u, { merge: true });
       }
 
       // 5. Broadcast to all open tabs and windows
@@ -1877,8 +1884,168 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const retrieveFirebaseAccounts = async (): Promise<UserAccount[]> => {
+    setIsSyncingLive(true);
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      const remoteUsers: UserAccount[] = [];
+      snap.forEach((docSnap) => {
+        const docData = docSnap.data() as UserAccount;
+        remoteUsers.push({ ...docData, id: docSnap.id });
+      });
+
+      if (remoteUsers.length > 0) {
+        setAllAccounts((prev) => {
+          const map = new Map<string, UserAccount>();
+          INITIAL_ACCOUNTS.forEach((a) => map.set(a.id, a));
+          prev.forEach((u) => map.set(u.id, u));
+          remoteUsers.forEach((u) => {
+            const existing = map.get(u.id);
+            const originalPassword =
+              u.password ||
+              existing?.password ||
+              INITIAL_ACCOUNTS.find(
+                (a) =>
+                  a.id === u.id ||
+                  (a.email && u.email && a.email.toLowerCase() === u.email.toLowerCase())
+              )?.password;
+            map.set(u.id, {
+              ...existing,
+              ...u,
+              ...(originalPassword ? { password: originalPassword } : {}),
+            });
+          });
+          const merged = Array.from(map.values());
+          if (currentUser) {
+            const fresh = merged.find((u) => u.id === currentUser.id);
+            if (fresh && JSON.stringify(fresh) !== JSON.stringify(currentUser)) {
+              setCurrentUser(fresh);
+            }
+          }
+          return merged;
+        });
+        showToast(`Retrieved ${remoteUsers.length} account(s) registered with Firebase`, 'success');
+      } else {
+        showToast('Firebase "users" collection checked: 0 remote records found.', 'info');
+      }
+      return remoteUsers;
+    } catch (err: any) {
+      console.warn('Error retrieving accounts from Firebase:', err);
+      showToast('Firebase account sync notice: ' + (err?.message || 'offline cache active'), 'info');
+      return [];
+    } finally {
+      setIsSyncingLive(false);
+      setLastSyncedAt(new Date().toISOString());
+    }
+  };
+
+  const retrieveFirebaseLessonPlans = async (): Promise<LessonPlan[]> => {
+    setIsSyncingLive(true);
+    try {
+      const snap = await getDocs(collection(db, 'lessonPlans'));
+      const remotePlans: LessonPlan[] = [];
+      snap.forEach((docSnap) => {
+        const planData = docSnap.data() as LessonPlan;
+        remotePlans.push({ ...planData, id: docSnap.id });
+      });
+
+      const remoteIdMap = new Map(remotePlans.map(p => [p.id, p]));
+
+      let completePlans: LessonPlan[] = [];
+      let localPlansToUpload: LessonPlan[] = [];
+
+      setLessonPlans((prev) => {
+        const planMap = new Map<string, LessonPlan>();
+
+        // 1. Start with existing local plans
+        prev.forEach((p) => planMap.set(p.id, p));
+
+        // 2. Identify local plans that need cloud storage (missing on remote or locally updated)
+        prev.forEach((p) => {
+          const remoteVersion = remoteIdMap.get(p.id);
+          if (!remoteVersion) {
+            localPlansToUpload.push(p);
+          } else {
+            const localDate = p.updatedAt || p.createdAt || '';
+            const remoteDate = remoteVersion.updatedAt || remoteVersion.createdAt || '';
+            if (localDate > remoteDate) {
+              localPlansToUpload.push(p);
+            }
+          }
+        });
+
+        // 3. Merge remote plans into the map
+        remotePlans.forEach((p) => {
+          const local = planMap.get(p.id);
+          if (!local) {
+            planMap.set(p.id, p);
+          } else {
+            const localUpdated = local.updatedAt || local.createdAt || '';
+            const remoteUpdated = p.updatedAt || p.createdAt || '';
+            if (remoteUpdated >= localUpdated) {
+              planMap.set(p.id, p);
+            }
+          }
+        });
+
+        completePlans = Array.from(planMap.values());
+        safeLocalStorageSet(STORAGE_KEYS.LESSON_PLANS, JSON.stringify(completePlans));
+        return completePlans;
+      });
+
+      // 4. Guarantee all teacher lesson plans are stored in Firebase Firestore
+      if (localPlansToUpload.length > 0) {
+        let uploaded = 0;
+        for (const p of localPlansToUpload) {
+          if (!p.id) continue;
+          const ok = await safeFirestoreSetDoc(doc(db, 'lessonPlans', p.id), p, { merge: true });
+          if (ok) uploaded++;
+        }
+        if (uploaded > 0) {
+          showToast(`☁️ Cloud Sync: Stored ${uploaded} teacher lesson plan(s) directly to Firebase Firestore`, 'success');
+        }
+      } else if (remotePlans.length > 0) {
+        showToast(`Retrieved ${remotePlans.length} lesson plan(s) from Firebase Firestore`, 'success');
+      }
+
+      return completePlans.length > 0 ? completePlans : remotePlans;
+    } catch (err: any) {
+      console.warn('Error retrieving lesson plans from Firebase:', err);
+      return [];
+    } finally {
+      setIsSyncingLive(false);
+      setLastSyncedAt(new Date().toISOString());
+    }
+  };
+
+  const syncLocalLessonPlansToFirestore = async (plansToSync?: LessonPlan[]): Promise<number> => {
+    const list = plansToSync || lessonPlans;
+    if (list.length === 0) return 0;
+    setIsSyncingLive(true);
+    let uploadedCount = 0;
+    try {
+      for (const plan of list) {
+        if (!plan.id) continue;
+        const success = await safeFirestoreSetDoc(doc(db, 'lessonPlans', plan.id), plan, { merge: true });
+        if (success) uploadedCount++;
+      }
+      if (uploadedCount > 0) {
+        showToast(`Cloud Sync Complete: ${uploadedCount} lesson plan(s) stored in Firebase Firestore!`, 'success');
+      }
+      return uploadedCount;
+    } catch (err: any) {
+      console.warn('Sync local lesson plans notice:', err);
+      return uploadedCount;
+    } finally {
+      setIsSyncingLive(false);
+      setLastSyncedAt(new Date().toISOString());
+    }
+  };
+
   const forceCloudSync = async () => {
     await pushLiveUpdate('Manual cloud database synchronization');
+    await retrieveFirebaseAccounts();
+    await retrieveFirebaseLessonPlans();
   };
 
   const updateSchoolProfile = async (updates: Partial<SchoolProfile>) => {
@@ -1893,8 +2060,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeLocalStorageSet(STORAGE_KEYS.SCHOOL_PROFILE, JSON.stringify(updated));
 
     try {
-      const cleanProfile = sanitizeForFirestore(updated);
-      await setDoc(doc(db, 'settings', 'schoolProfile'), cleanProfile, { merge: true });
+      await safeFirestoreSetDoc(doc(db, 'settings', 'schoolProfile'), updated, { merge: true });
     } catch (e) {
       console.warn('Firestore schoolProfile update warning/notice:', e);
     }
@@ -1923,8 +2089,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeLocalStorageSet(STORAGE_KEYS.SCHOOL_PROFILE, JSON.stringify(updated));
 
     try {
-      const cleanProfile = sanitizeForFirestore(updated);
-      await setDoc(doc(db, 'settings', 'schoolProfile'), cleanProfile, { merge: true });
+      await safeFirestoreSetDoc(doc(db, 'settings', 'schoolProfile'), updated, { merge: true });
     } catch (e) {
       console.warn('Firestore custom logo update warning:', e);
     }
@@ -1947,8 +2112,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeLocalStorageSet(STORAGE_KEYS.SCHOOL_PROFILE, JSON.stringify(updated));
 
     try {
-      const cleanProfile = sanitizeForFirestore(updated);
-      await setDoc(doc(db, 'settings', 'schoolProfile'), cleanProfile, { merge: true });
+      await safeFirestoreSetDoc(doc(db, 'settings', 'schoolProfile'), updated, { merge: true });
     } catch (e) {
       console.warn('Firestore logo reset warning:', e);
     }
@@ -1988,8 +2152,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeLocalStorageSet(STORAGE_KEYS.SCHOOL_PROFILE, JSON.stringify(updated));
 
     try {
-      const cleanProfile = sanitizeForFirestore(updated);
-      await setDoc(doc(db, 'settings', 'schoolProfile'), cleanProfile, { merge: true });
+      await safeFirestoreSetDoc(doc(db, 'settings', 'schoolProfile'), updated, { merge: true });
     } catch (e) {
       console.warn('Firestore global signup status update warning:', e);
     }
@@ -2023,8 +2186,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     safeLocalStorageSet(STORAGE_KEYS.SCHOOL_PROFILE, JSON.stringify(updated));
 
     try {
-      const cleanProfile = sanitizeForFirestore(updated);
-      await setDoc(doc(db, 'settings', 'schoolProfile'), cleanProfile, { merge: true });
+      await safeFirestoreSetDoc(doc(db, 'settings', 'schoolProfile'), updated, { merge: true });
     } catch (e) {
       console.warn('Firestore campus signup status update warning:', e);
     }
@@ -2075,6 +2237,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         lastSyncedAt,
         pushLiveUpdate,
         forceCloudSync,
+        retrieveFirebaseAccounts,
+        retrieveFirebaseLessonPlans,
+        syncLocalLessonPlansToFirestore,
         isAuthModalOpen,
         setIsAuthModalOpen,
         authModalMode,

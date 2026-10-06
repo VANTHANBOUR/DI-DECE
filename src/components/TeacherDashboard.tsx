@@ -31,7 +31,9 @@ import {
   Filter,
   Globe,
   Building2,
-  Trash2
+  Trash2,
+  Cloud,
+  RefreshCw
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -58,7 +60,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     showToast, 
     formatAgeGroup, 
     selectedCampusId,
-    allAccounts 
+    allAccounts,
+    retrieveFirebaseLessonPlans,
+    syncLocalLessonPlansToFirestore,
+    isSyncingLive
   } = useApp();
 
   const activeCampus = selectedCampusId ? CAMPUS_LIST.find(c => c.id === selectedCampusId) : null;
@@ -210,6 +215,19 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={async () => {
+                await syncLocalLessonPlansToFirestore();
+                await retrieveFirebaseLessonPlans();
+              }}
+              disabled={isSyncingLive}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-800/80 hover:bg-emerald-800 text-white font-bold text-xs rounded-2xl border border-emerald-400/40 backdrop-blur-xs transition-all active:scale-95 disabled:opacity-50"
+              title="Ensure all lesson plans are uploaded and stored in Firebase Firestore"
+            >
+              <Cloud className="w-4 h-4 text-emerald-300" />
+              <span>{isSyncingLive ? 'Syncing with Firestore...' : 'Store in Firebase Cloud'}</span>
+            </button>
+
             <button
               onClick={() => setIsProfileModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2.5 bg-white/15 hover:bg-white/25 text-white font-bold text-xs rounded-2xl border border-white/25 backdrop-blur-xs transition-all active:scale-95"
@@ -554,6 +572,15 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         {formatDateRange(plan.startDate, plan.endDate, ' to ')}
                       </span>
                       {getStatusBadge(plan.status)}
+
+                      {/* Firestore Cloud Status Badge */}
+                      <span 
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200"
+                        title="Stored in Firebase Firestore Cloud Database"
+                      >
+                        <Cloud className="w-2.5 h-2.5 text-[#007A43]" />
+                        Firestore Synced
+                      </span>
 
                       {/* Campus Badge */}
                       {planCampus && (

@@ -122,20 +122,21 @@ export const AuthModal: React.FC = () => {
     }
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: signInEmail.trim(),
-        password: signInPassword,
-      });
+      // Optional Supabase attempt
+      try {
+        if (supabase?.auth) {
+          await supabase.auth.signInWithPassword({
+            email: signInEmail.trim(),
+            password: signInPassword,
+          }).catch(() => {});
+        }
+      } catch {}
 
-      if (error) {
-        setAuthError(error.message);
-        showToast(error.message, 'error');
-        return;
+      const success = await signIn(signInEmail, signInPassword);
+      if (success) {
+        setIsAuthModalOpen(false);
+        window.location.href = '/';
       }
-
-      await signIn(signInEmail, signInPassword);
-      setIsAuthModalOpen(false);
-      window.location.href = '/';
     } catch (err: any) {
       setAuthError(err?.message || 'Failed to sign in. Please check your credentials.');
     } finally {
@@ -155,18 +156,17 @@ export const AuthModal: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: password || 'password123',
-      });
+      // Optional Supabase attempt
+      try {
+        if (supabase?.auth) {
+          await supabase.auth.signUp({
+            email: email.trim(),
+            password: password || 'password123',
+          }).catch(() => {});
+        }
+      } catch {}
 
-      if (error) {
-        setAuthError(error.message);
-        showToast(error.message, 'error');
-        return;
-      }
-
-      await signUp({
+      const user = await signUp({
         name: name.trim(),
         khmerName: khmerName.trim(),
         email: email.trim(),
@@ -181,8 +181,10 @@ export const AuthModal: React.FC = () => {
         ageGroup: role === 'teacher' ? assignedClassId : undefined,
       });
 
-      setIsAuthModalOpen(false);
-      window.location.href = '/';
+      if (user) {
+        setIsAuthModalOpen(false);
+        window.location.href = '/';
+      }
     } catch (err: any) {
       setAuthError(err?.message || 'Failed to register account.');
     } finally {

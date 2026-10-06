@@ -34,7 +34,8 @@ import {
   X,
   ExternalLink,
   ChevronRight,
-  Briefcase
+  Briefcase,
+  RefreshCw
 } from 'lucide-react';
 
 interface TeachersDirectoryProps {
@@ -52,7 +53,10 @@ export const TeachersDirectory: React.FC<TeachersDirectoryProps> = ({
     classrooms, 
     currentUser, 
     formatAgeGroup,
-    showToast 
+    showToast,
+    retrieveFirebaseAccounts,
+    retrieveFirebaseLessonPlans,
+    isSyncingLive
   } = useApp();
 
   const [campusFilter, setCampusFilter] = useState<string>('all');
@@ -203,6 +207,19 @@ export const TeachersDirectory: React.FC<TeachersDirectoryProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              onClick={async () => {
+                await retrieveFirebaseAccounts();
+                await retrieveFirebaseLessonPlans();
+              }}
+              disabled={isSyncingLive}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-[#007A43] border border-emerald-200 font-bold text-xs rounded-2xl transition-all shadow-2xs active:scale-95 disabled:opacity-50"
+              title="Retrieve all registered accounts and lesson plans directly from Firebase Firestore"
+            >
+              <RefreshCw className={`w-4 h-4 text-[#007A43] ${isSyncingLive ? 'animate-spin' : ''}`} />
+              <span>{isSyncingLive ? 'Retrieving from Firebase...' : 'Retrieve from Firebase'}</span>
+            </button>
+
             <button
               onClick={exportRosterCsv}
               className="flex items-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-2xl transition-all shadow-2xs"

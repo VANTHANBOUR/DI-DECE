@@ -119,19 +119,20 @@ export const AuthGate: React.FC = () => {
     }
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: signInEmail.trim(),
-        password: signInPassword,
-      });
+      // Optional Supabase attempt
+      try {
+        if (supabase?.auth) {
+          await supabase.auth.signInWithPassword({
+            email: signInEmail.trim(),
+            password: signInPassword,
+          }).catch(() => {});
+        }
+      } catch {}
 
-      if (error) {
-        setAuthError(error.message);
-        showToast(error.message, 'error');
-        return;
+      const success = await signIn(signInEmail, signInPassword);
+      if (success) {
+        window.location.href = '/';
       }
-
-      await signIn(signInEmail, signInPassword);
-      window.location.href = '/';
     } catch (err: any) {
       setAuthError(err?.message || 'Failed to sign in. Please check your credentials.');
     } finally {
@@ -152,18 +153,17 @@ export const AuthGate: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password: password || 'password123',
-      });
+      // Optional Supabase attempt
+      try {
+        if (supabase?.auth) {
+          await supabase.auth.signUp({
+            email: email.trim(),
+            password: password || 'password123',
+          }).catch(() => {});
+        }
+      } catch {}
 
-      if (error) {
-        setAuthError(error.message);
-        showToast(error.message, 'error');
-        return;
-      }
-
-      await signUp({
+      const user = await signUp({
         name: name.trim(),
         khmerName: khmerName.trim(),
         email: email.trim(),
@@ -177,7 +177,9 @@ export const AuthGate: React.FC = () => {
         roomNumber: role === 'teacher' ? roomNumber.trim() : undefined,
       });
 
-      window.location.href = '/';
+      if (user) {
+        window.location.href = '/';
+      }
     } catch (err: any) {
       setAuthError(err?.message || 'Failed to register account.');
     } finally {

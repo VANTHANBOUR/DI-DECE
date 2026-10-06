@@ -42,7 +42,8 @@ import {
   Copy,
   Check,
   User,
-  MapPin
+  MapPin,
+  RefreshCw
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -72,7 +73,10 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
     formatAgeGroup,
     selectedCampusId,
     switchUser,
-    generatePlansForAccount
+    generatePlansForAccount,
+    retrieveFirebaseAccounts,
+    retrieveFirebaseLessonPlans,
+    isSyncingLive
   } = useApp();
 
   const [activeSubTab, setActiveSubTab] = useState<'users' | 'plans' | 'classrooms' | 'logs' | 'profile'>('users');
@@ -286,6 +290,19 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                       : 'Active All'}
                   </span>
                 )}
+              </button>
+
+              <button
+                onClick={async () => {
+                  await retrieveFirebaseAccounts();
+                  await retrieveFirebaseLessonPlans();
+                }}
+                disabled={isSyncingLive}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-800/90 hover:bg-emerald-800 text-white font-bold text-xs rounded-2xl shadow-sm border border-emerald-500/40 transition-all active:scale-95 disabled:opacity-50"
+                title="Retrieve all registered accounts and lesson plans directly from Firebase Firestore"
+              >
+                <RefreshCw className={`w-4 h-4 text-emerald-300 ${isSyncingLive ? 'animate-spin' : ''}`} />
+                <span>{isSyncingLive ? 'Retrieving...' : 'Retrieve from Firebase'}</span>
               </button>
 
               <button
