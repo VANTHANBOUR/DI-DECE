@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { supabase } from '../supabaseClient';
 import { BrandLogo, SchoolLogoIcon } from './BrandLogo';
 import { UserAvatar } from './UserAvatar';
 import { UserRole, EarlyChildhoodAgeGroup, CampusId, CAMPUS_LIST, getCampusClassroomOptions } from '../types';
@@ -56,6 +57,7 @@ export const AuthModal: React.FC = () => {
   const institutionEnglish = isDKCampus ? 'Dewey Kindergarten' : (schoolProfile?.schoolNameEnglish || 'Dewey Childcare House');
 
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [showDomainHelp, setShowDomainHelp] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
 
@@ -112,13 +114,30 @@ export const AuthModal: React.FC = () => {
 
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     if (!signInEmail.trim()) {
+      setAuthError('Please enter your email address.');
       showToast('Please enter your email address.', 'warning');
       return;
     }
     setIsLoading(true);
     try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: signInEmail.trim(),
+        password: signInPassword,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        showToast(error.message, 'error');
+        return;
+      }
+
       await signIn(signInEmail, signInPassword);
+      setIsAuthModalOpen(false);
+      window.location.href = '/';
+    } catch (err: any) {
+      setAuthError(err?.message || 'Failed to sign in. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -126,7 +145,9 @@ export const AuthModal: React.FC = () => {
 
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     if (!name.trim() || !email.trim()) {
+      setAuthError('Please provide your full name and email address.');
       showToast('Please provide your full name and email address.', 'warning');
       return;
     }
@@ -134,6 +155,17 @@ export const AuthModal: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password || 'password123',
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        showToast(error.message, 'error');
+        return;
+      }
+
       await signUp({
         name: name.trim(),
         khmerName: khmerName.trim(),
@@ -148,6 +180,11 @@ export const AuthModal: React.FC = () => {
         assignedClassName: role === 'teacher' ? assignedClassId : undefined,
         ageGroup: role === 'teacher' ? assignedClassId : undefined,
       });
+
+      setIsAuthModalOpen(false);
+      window.location.href = '/';
+    } catch (err: any) {
+      setAuthError(err?.message || 'Failed to register account.');
     } finally {
       setIsLoading(false);
     }
@@ -217,7 +254,7 @@ export const AuthModal: React.FC = () => {
           <div className="flex items-center gap-2 mt-4 bg-white/10 p-1 rounded-2xl backdrop-blur-xs max-w-xs">
             <button
               type="button"
-              onClick={() => setAuthModalMode('signin')}
+              onClick={() => { setAuthModalMode('signin'); setAuthError(null); }}
               className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all ${
                 authModalMode === 'signin'
                   ? 'bg-white text-[#006838] shadow-xs'
@@ -228,7 +265,7 @@ export const AuthModal: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={() => setAuthModalMode('signup')}
+              onClick={() => { setAuthModalMode('signup'); setAuthError(null); }}
               className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all ${
                 authModalMode === 'signup'
                   ? 'bg-white text-[#006838] shadow-xs'
@@ -514,6 +551,13 @@ export const AuthModal: React.FC = () => {
                 )}
               </button>
 
+              {authError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{authError}</span>
+                </div>
+              )}
+
               <div className="text-center pt-2">
                 <p className="text-xs text-slate-500">
                   Don't have an educator account?{' '}
@@ -712,6 +756,13 @@ export const AuthModal: React.FC = () => {
                   </>
                 )}
               </button>
+
+              {authError && (
+                <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{authError}</span>
+                </div>
+              )}
 
               <div className="text-center pt-1">
                 <p className="text-xs text-slate-500">

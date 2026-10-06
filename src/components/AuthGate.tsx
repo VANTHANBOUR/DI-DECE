@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { supabase } from '../supabaseClient';
 import { BrandLogo, DCHShield, DIShield, DKShield } from './BrandLogo';
 import { UserRole, CampusId, CAMPUS_LIST, getCampusClassroomOptions } from '../types';
 import { CampusTabsBar } from './CampusTabsBar';
@@ -54,6 +55,7 @@ export const AuthGate: React.FC = () => {
 
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [isLoading, setIsLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [showDomainHelp, setShowDomainHelp] = useState(false);
   const [copiedDomain, setCopiedDomain] = useState(false);
 
@@ -109,13 +111,29 @@ export const AuthGate: React.FC = () => {
 
   const handleSignInSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     if (!signInEmail.trim()) {
+      setAuthError('Please enter your school email address.');
       showToast('Please enter your school email address.', 'warning');
       return;
     }
     setIsLoading(true);
     try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: signInEmail.trim(),
+        password: signInPassword,
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        showToast(error.message, 'error');
+        return;
+      }
+
       await signIn(signInEmail, signInPassword);
+      window.location.href = '/';
+    } catch (err: any) {
+      setAuthError(err?.message || 'Failed to sign in. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }
@@ -123,7 +141,9 @@ export const AuthGate: React.FC = () => {
 
   const handleSignUpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     if (!name.trim() || !email.trim()) {
+      setAuthError('Please enter your full name and institutional email.');
       showToast('Please enter your full name and institutional email.', 'warning');
       return;
     }
@@ -132,6 +152,17 @@ export const AuthGate: React.FC = () => {
     setIsLoading(true);
 
     try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password || 'password123',
+      });
+
+      if (error) {
+        setAuthError(error.message);
+        showToast(error.message, 'error');
+        return;
+      }
+
       await signUp({
         name: name.trim(),
         khmerName: khmerName.trim(),
@@ -145,6 +176,10 @@ export const AuthGate: React.FC = () => {
         ageGroup: role === 'teacher' ? assignedClassId : undefined,
         roomNumber: role === 'teacher' ? roomNumber.trim() : undefined,
       });
+
+      window.location.href = '/';
+    } catch (err: any) {
+      setAuthError(err?.message || 'Failed to register account.');
     } finally {
       setIsLoading(false);
     }
@@ -331,7 +366,7 @@ export const AuthGate: React.FC = () => {
                 <div className="flex items-center gap-1.5 bg-black/30 p-1 rounded-2xl border border-white/10">
                   <button
                     type="button"
-                    onClick={() => setMode('signin')}
+                    onClick={() => { setMode('signin'); setAuthError(null); }}
                     className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
                       mode === 'signin'
                         ? 'bg-white text-[#006838] shadow-md'
@@ -342,7 +377,7 @@ export const AuthGate: React.FC = () => {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setMode('signup')}
+                    onClick={() => { setMode('signup'); setAuthError(null); }}
                     className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all ${
                       mode === 'signup'
                         ? 'bg-white text-[#006838] shadow-md'
@@ -610,6 +645,13 @@ export const AuthGate: React.FC = () => {
                         </>
                       )}
                     </button>
+
+                    {authError && (
+                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center gap-2 animate-in fade-in">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span>{authError}</span>
+                      </div>
+                    )}
                   </form>
                 ) : (
                   /* SIGN UP FORM */
@@ -804,6 +846,13 @@ export const AuthGate: React.FC = () => {
                         </>
                       )}
                     </button>
+
+                    {authError && (
+                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center gap-2 animate-in fade-in">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span>{authError}</span>
+                      </div>
+                    )}
                   </form>
                 )}
               </div>
